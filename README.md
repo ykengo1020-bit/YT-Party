@@ -2,7 +2,7 @@
 
 拳で殴り合い、掴んで、投げて、相手を場外に落とせば勝ち。スキルや状態異常で何でもアリの友情破壊ゲーム。
 
-**▶ 遊ぶ：** このリポジトリの GitHub Pages（Settings → Pages に表示されるURL）を Chrome / Edge で開く
+**▶ 遊ぶ：https://ykengo1020-bit.github.io/YT-Party/** （Chrome / Edge 推奨）
 
 - CPU戦、オンライン対戦（部屋コードで最大8人）、チーム戦
 - マップ6種類（開始時に投票）
