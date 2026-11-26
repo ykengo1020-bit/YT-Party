@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>友情ブレイカーズ - 3D乱闘パーティー</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap" rel="stylesheet">
@@ -23,6 +25,7 @@
     <div class="row"><input id="roomIn" class="txt" maxlength="5" placeholder="部屋コード"><button class="btn cyan" id="bJoin" style="flex:0 0 auto">参加</button></div>
     <div class="err" id="tErr"></div>
     <div class="row"><button class="btn white small" id="bHelp">操作説明</button><button class="btn white small" id="bRules">ルール説明</button><button class="btn white small" id="bSet">設定</button></div>
+    <div class="row mobrow"><button class="btn white small" id="bMobile"></button><button class="btn white small hidden" id="bFull" style="flex:0 0 auto">全画面</button></div>
     <div class="tiny">オンライン対戦はブラウザ同士の直接通信です。接続の仲介にPeerJSの無料サーバーを使うのでネット接続が必要です。</div>
   </div>
 </div>
@@ -94,7 +97,7 @@
       <div class="tpbar"><b id="hTp"></b><span id="hTpN">TP 0/30</span></div>
     </div>
     <div class="skills" id="hSk"></div>
-    <div class="slot"><div class="tiny">アイテム [E]使う [Q]投げる</div><div class="big" id="hItem">なし</div><div class="tiny" id="hTk"></div></div>
+    <div class="slot"><div class="tiny" id="slotKeys">アイテム [E]使う [Q]投げる</div><div class="big" id="hItem">なし</div><div class="tiny" id="hTk"></div></div>
   </div>
   <div class="selbox hidden" id="hSel"></div>
   <div class="cross"></div>
@@ -103,6 +106,24 @@
   <div id="banners"></div>
   <div id="arrows"></div>
 </div>
+
+<!-- モバイル版のタッチ操作 -->
+<div id="touch" class="hidden">
+  <div id="tStick" class="hidden"><div class="base"></div><div class="knob"></div></div>
+  <div id="tTop"><button class="tsm" data-ui="pause">Ⅱ</button><button class="tsm" data-ui="help">？</button><button class="tsm hidden" data-a="shop" id="tShop">交換</button></div>
+  <div id="tSkWrap"></div>
+  <div id="tBtns">
+    <button class="tb big" data-a="punch" style="--x:20;--y:18;--s:92">パンチ<small>長押しで溜め</small></button>
+    <button class="tb" data-a="jump" style="--x:128;--y:12;--s:74">ジャンプ</button>
+    <button class="tb" data-a="grab" style="--x:30;--y:124;--s:74">掴む<small>離して投げ</small></button>
+    <button class="tb sm" data-a="guard" style="--x:216;--y:14;--s:60">ガード</button>
+    <button class="tb sm" data-a="head" style="--x:120;--y:100;--s:58">頭突き</button>
+    <button class="tb sm" data-a="dash" style="--x:206;--y:88;--s:58">ダッシュ</button>
+    <button class="tb it" data-a="use" style="--x:40;--y:212;--s:62">使う</button>
+    <button class="tb it sm" data-a="drop" style="--x:118;--y:176;--s:50">投げ</button>
+  </div>
+</div>
+<div id="rotate" class="hidden"><div><div class="ph">📱</div>スマホを横向きにしてね</div></div>
 
 <!-- 操作説明 -->
 <div id="help" class="ov hidden"><div class="panel helppanel">
@@ -139,7 +160,8 @@
 <div id="shop" class="ov hidden"><div class="panel">
   <div class="h1">アイテム交換所 <span class="tiny" id="shopTk"></span></div>
   <div class="shopgrid" id="shopGrid"></div>
-  <div class="tiny" style="margin-top:10px">数字キーかクリックで交換 ／ T か Esc でとじる</div>
+  <div class="tiny" id="shopNote" style="margin-top:10px">数字キーかクリックで交換 ／ T か Esc でとじる</div>
+  <div style="text-align:right;margin-top:8px"><button class="btn small white" id="shopClose">とじる</button></div>
 </div></div>
 
 <!-- 一時停止 -->
@@ -150,6 +172,7 @@
   <button class="btn white" id="bHelp2">操作説明</button>
   <button class="btn white" id="bSet3">設定</button>
   <button class="btn white" id="bRules2">ルール説明</button>
+  <button class="btn white hidden" id="bFull2">全画面にする</button>
   <button class="btn white" id="bQuit">タイトルへ戻る</button>
 </div></div>
 

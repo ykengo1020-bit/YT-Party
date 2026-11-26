@@ -17,12 +17,29 @@ window.Settings = (function () {
     sens: 1.0, invertY: false, camDist: 9.5, fov: 60,
     master: 70, bgm: 40, sfx: 90,
     shadows: true, res: 1.0, shake: true, tags: true, arrows: true,
+    // モバイル版
+    mobileMode: 'auto', tSens: 1.0, tSize: 1.0, tAlpha: 0.8, tSwap: false, tFull: true, tInvertY: false,
   };
+  // スマホ・タブレットかどうか（タッチが主な入力の端末）
+  const TOUCH_DEVICE = (() => {
+    try {
+      const coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+      const tp = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+      const ua = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && (navigator.maxTouchPoints || 0) > 1);
+      return !!(tp && (coarse || ua));
+    } catch (e) { return false; }
+  })();
+  // モバイル版でのボタン名
+  const MLABEL = { fwd: 'スティック', back: 'スティック', left: 'スティック', right: 'スティック', jump: 'ジャンプ', dash: 'ダッシュ', punch: 'パンチ', grab: '掴む', head: '頭突き', guard: 'ガード',
+    s1: 'スキル1', s2: 'スキル2', s3: 'スキル3', s4: 'スキル4', v: '固有', g: 'リズム', use: '使う', drop: '投げ', shop: '交換', camL: '右側ドラッグ', camR: '右側ドラッグ', help: '？', mute: '音' };
   let S = load();
   function load() {
     try {
       const j = JSON.parse(localStorage.getItem('yb_settings') || '{}');
-      return { ...DEF, ...j, keys: { ...DEF.keys, ...(j.keys || {}) } };
+      const first = !localStorage.getItem('yb_settings');
+      const o = { ...DEF, ...j, keys: { ...DEF.keys, ...(j.keys || {}) } };
+      if (first && TOUCH_DEVICE) { o.shadows = false; o.res = 0.8; } // スマホは最初から軽めの画質
+      return o;
     } catch (e) { return JSON.parse(JSON.stringify(DEF)); }
   }
   function save() { try { localStorage.setItem('yb_settings', JSON.stringify(S)); } catch (e) { /* noop */ } apply(); }
@@ -41,7 +58,8 @@ window.Settings = (function () {
     if (code.startsWith('Numpad')) return 'テンキー' + code.slice(6);
     return code;
   }
-  function key(action) { return label(S.keys[action]); }
+  function isMobile() { return S.mobileMode === 'on' || (S.mobileMode === 'auto' && TOUCH_DEVICE); }
+  function key(action) { return isMobile() ? (MLABEL[action] || action) : label(S.keys[action]); }
   function actionsFor(code) { return Object.keys(S.keys).filter((a) => S.keys[a] === code); }
 
   // ---------- 画面 ----------
@@ -53,11 +71,21 @@ window.Settings = (function () {
     document.querySelectorAll('#setTabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === tab));
     const slider = (k, name, min, max, step, fmt) => `<div class="srow"><span>${name}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${S[k]}" data-k="${k}"><b id="v_${k}">${fmt(S[k])}</b></div>`;
     const check = (k, name) => `<div class="srow"><span>${name}</span><label class="sw"><input type="checkbox" data-k="${k}" ${S[k] ? 'checked' : ''}><i></i></label><b></b></div>`;
+    const mob = isMobile();
+    const tb = document.querySelector('#setTabs button[data-t="keys"]'); if (tb) tb.textContent = mob ? 'タッチ操作' : '操作・キー割り当て';
+    const modeRow = `<div class="srow"><span>モバイル版（タッチ操作）</span><div class="seg" id="setMob">${[['auto', '自動' + (TOUCH_DEVICE ? '（スマホ）' : '（PC）')], ['on', 'オン'], ['off', 'オフ']].map(([v, n]) => `<button data-v="${v}" class="${S.mobileMode === v ? 'on' : ''}">${n}</button>`).join('')}</div><b>${mob ? 'オン' : 'オフ'}</b></div>`;
     const F = { sens: (v) => (+v).toFixed(2) + '倍', camDist: (v) => (+v).toFixed(1) + 'm', fov: (v) => v + '°', pct: (v) => v + '%', res: (v) => Math.round(v * 100) + '%' };
-    if (tab === 'keys') {
-      el.innerHTML = '<div class="tiny" style="margin-bottom:8px">ボタンをクリックしてから、割り当てたいキーかマウスボタンを押してください（Escで取り消し）。同じキーが他にあると入れ替わります。</div><div class="keygrid">' +
+    F.tSize = F.res; F.tAlpha = F.res; F.tSens = F.sens;
+    if (tab === 'keys' && mob) {
+      el.innerHTML = modeRow + slider('tSize', 'ボタンの大きさ', 0.7, 1.4, 0.05, F.res) + slider('tAlpha', 'ボタンの濃さ', 0.3, 1, 0.05, F.res) +
+        check('tSwap', '左右を入れ替える（左手でボタン）') + check('tFull', 'ゲーム開始時に全画面にする') +
+        '<div class="tiny" style="margin-top:8px">左側をドラッグで移動、右側の空いているところをドラッグでカメラ。ボタンの配置は「操作説明」で確認できます。</div>';
+    } else if (tab === 'keys') {
+      el.innerHTML = modeRow + '<div class="tiny" style="margin-bottom:8px">ボタンをクリックしてから、割り当てたいキーかマウスボタンを押してください（Escで取り消し）。同じキーが他にあると入れ替わります。</div><div class="keygrid">' +
         ACTIONS.map(([a, n]) => `<div class="krow"><span>${n}</span><button class="kbtn ${capturing === a ? 'cap' : ''}" data-a="${a}">${capturing === a ? 'キーを押して…' : label(S.keys[a])}</button></div>`).join('') + '</div>';
       el.querySelectorAll('.kbtn').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); capturing = b.dataset.a; build(); }));
+    } else if (tab === 'cam' && mob) {
+      el.innerHTML = slider('tSens', 'カメラ感度（スワイプ）', 0.3, 3, 0.05, F.sens) + check('tInvertY', '上下を反転する') + slider('camDist', 'カメラの距離', 6, 16, 0.5, F.camDist) + slider('fov', '視野角', 45, 90, 1, F.fov) + check('shake', '画面の揺れ');
     } else if (tab === 'cam') {
       el.innerHTML = slider('sens', 'マウス感度', 0.2, 3, 0.05, F.sens) + check('invertY', '上下を反転する') + slider('camDist', 'カメラの距離', 6, 16, 0.5, F.camDist) + slider('fov', '視野角', 45, 90, 1, F.fov) + check('shake', '画面の揺れ');
     } else if (tab === 'snd') {
@@ -66,6 +94,7 @@ window.Settings = (function () {
       el.innerHTML = check('shadows', '影を表示する') + slider('res', '描画解像度（下げると軽くなる）', 0.5, 1.5, 0.05, F.res) + check('tags', '名前とヘロヘロ値を頭上に表示') + check('arrows', '画面外のプレイヤーを矢印で表示');
     }
     el.querySelectorAll('input[type=range]').forEach((r) => (r.oninput = () => { const k = r.dataset.k; S[k] = +r.value; const f = F[k] || F.pct; $('v_' + k).textContent = f(S[k]); save(); }));
+    el.querySelectorAll('#setMob button').forEach((b) => (b.onclick = () => { S.mobileMode = b.dataset.v; save(); build(); }));
     el.querySelectorAll('input[type=checkbox]').forEach((c) => (c.onchange = () => { S[c.dataset.k] = c.checked; save(); }));
   }
   function capture(code) {
@@ -89,5 +118,5 @@ window.Settings = (function () {
   }
   function open() { capturing = null; document.getElementById('settings').classList.remove('hidden'); build(); }
   function isCapturing() { return !!capturing; }
-  return { get: () => S, save, onChange, apply, label, key, actionsFor, ACTIONS, init, open, isCapturing };
+  return { isMobile, TOUCH_DEVICE, setMobileMode: (v) => { S.mobileMode = v; save(); }, get: () => S, save, onChange, apply, label, key, actionsFor, ACTIONS, init, open, isCapturing };
 })();

@@ -22,7 +22,7 @@
   // ---------- 初期化 ----------
   Render.init($('c'));
   Settings.init();
-  Settings.onChange((st) => { Render.applySettings(st); Sfx.setVolumes(st.master, st.bgm, st.sfx); updateKeyTexts(); S.faceSet = false; });
+  Settings.onChange((st) => { Render.applySettings(st); Sfx.setVolumes(st.master, st.bgm, st.sfx); applyMobile(); updateKeyTexts(); S.faceSet = false; });
   thumbs = Render.thumbnails();
   Render.previewChar();
   S.name = localStorage.getItem('yb_name') || ('プレイヤー' + ((Math.random() * 90 + 10) | 0));
@@ -147,6 +147,7 @@
 
   // 操作説明などのキー表示を設定に合わせる
   function updateKeyTexts() {
+    if (S.mobile) return updateKeyTextsMobile();
     const raw = (a) => Settings.get().keys[a];
     const cap = (a) => { const c = raw(a), l = Settings.key(a); return `<span class="cap ${c && c.startsWith('Mouse') ? 'm' : ''} ${l.length > 3 ? 'wide' : ''}">${esc(l)}</span>`; };
     const row = (keys, t, sub) => `<div class="hrow"><div class="ks">${keys}</div><div class="t">${t}${sub ? `<small>${sub}</small>` : ''}</div></div>`;
@@ -187,8 +188,69 @@
         row(cap('help') + cap('mute'), '操作説明 ／ 音オンオフ') +
         row('<span class="cap wide">Esc</span>', 'メニュー', '設定・ルール説明・タイトルへ')),
     ].join('');
+    $('helpSet').textContent = 'キーを変える';
     $('helpTip').innerHTML = 'キーやマウス感度は「設定」から好きなように変えられます。この画面の表示も変えたキーに合わせて変わります。';
     $('hint').textContent = `[${Settings.key('help')}] 操作説明　[${Settings.key('mute')}] 音　[Esc] 設定・メニュー`;
+  }
+  // モバイル版の操作説明
+  function updateKeyTextsMobile() {
+    const COL = { punch: '#ef4444', jump: '#3b82f6', grab: '#f97316', guard: '#0ea5e9', head: '#e11d48', dash: '#6366f1', use: '#16a34a', drop: '#65a30d' };
+    const bi = (a, txt) => `<span class="tbi" style="background:${COL[a] || '#7c5cff'}">${txt || Settings.key(a)}</span>`;
+    const row = (k, t, sub) => `<div class="hrow"><div class="ks">${k}</div><div class="t">${t}${sub ? `<small>${sub}</small>` : ''}</div></div>`;
+    const card = (title, color, body) => `<div class="hcard"><h4 style="background:${color}">${title}</h4><div class="hb">${body}</div></div>`;
+    const ges = (t) => `<span class="gest">${t}</span>`;
+    // 画面の配置図（実際のボタン位置から作る）
+    const sw = !!Settings.get().tSwap, W = 300, H = 140, k = 0.36;
+    let dots = '';
+    document.querySelectorAll('#tBtns .tb').forEach((b) => {
+      const cs = b.style, x = +cs.getPropertyValue('--x'), y = +cs.getPropertyValue('--y'), sz = +cs.getPropertyValue('--s');
+      const r = (sz * k) / 2, cx = sw ? x * k + r + 6 : W - x * k - r - 6, cy = H - y * k - r - 6;
+      dots += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${COL[b.dataset.a]}" stroke="#15121f" stroke-width="2"/><text x="${cx}" y="${cy + 3}" font-size="7.5" font-weight="900" text-anchor="middle" fill="#fff">${Settings.key(b.dataset.a)}</text>`;
+    });
+    const sx = sw ? W - 62 : 62;
+    const diagram = `<svg viewBox="0 0 ${W} ${H}" class="phone"><rect x="2" y="2" width="${W - 4}" height="${H - 4}" rx="16" fill="#2a2140" stroke="#15121f" stroke-width="4"/>
+      <rect x="${sw ? W * 0.6 : 6}" y="6" width="${W * 0.4 - 6}" height="${H - 12}" rx="12" fill="rgba(59,130,246,.18)" stroke="#3b82f6" stroke-dasharray="4 3"/>
+      <circle cx="${sx}" cy="${H - 46}" r="24" fill="rgba(255,255,255,.25)" stroke="#fff" stroke-width="2"/><circle cx="${sx + 8}" cy="${H - 52}" r="11" fill="#fff"/>
+      <text x="${sx}" y="20" font-size="9" font-weight="900" text-anchor="middle" fill="#93c5fd">ここをドラッグで移動</text>
+      <text x="${W / 2}" y="${H / 2 - 8}" font-size="9" font-weight="900" text-anchor="middle" fill="#fde68a">空いている所を</text><text x="${W / 2}" y="${H / 2 + 4}" font-size="9" font-weight="900" text-anchor="middle" fill="#fde68a">ドラッグでカメラ</text>
+      <g>${[0, 1, 2, 3].map((i) => `<rect x="${(sw ? 8 : W - 106) + i * 24}" y="8" width="20" height="15" rx="4" fill="#fff8ec" stroke="#15121f" stroke-width="1.5"/><text x="${(sw ? 18 : W - 96) + i * 24}" y="18.5" font-size="7" font-weight="900" text-anchor="middle">S${i + 1}</text>`).join('')}</g>
+      <text x="${sw ? 108 : W - 110}" y="18.5" font-size="7" font-weight="900" fill="#fff" text-anchor="${sw ? 'start' : 'end'}">スキル（タップ）→</text>
+      ${dots}</svg>`;
+    $('helpKeys').innerHTML = `<div class="hcard wide"><h4 style="background:#15121f">画面の配置（スマホを横向きで）</h4><div class="hb" style="align-items:center">${diagram}</div></div>` + [
+      card('移動', '#3b82f6',
+        row(ges('左側をドラッグ'), '移動', '指を置いた所にスティックが出る。倒すほど速い') +
+        row(bi('jump'), 'ジャンプ', '空中でもう1回＝二段ジャンプ。崖では登る') +
+        row(bi('dash'), 'ダッシュ', '崖につかまっているときは手を離す') +
+        row(bi('guard') + '<i>＋</i>' + bi('jump'), '浮き床から降りる', 'ガードを押したままジャンプ')),
+      card('攻撃', '#ef4444',
+        row(bi('punch'), 'パンチ', '3連続で当てるとコンボで大きく吹っ飛ぶ') +
+        row(bi('punch') + '<i>長押し</i>', '溜めパンチ', '手が光ったら指を離す') +
+        row(bi('head'), '頭突き', '届く距離は短いがヘロヘロ値が大きく上がる') +
+        row(bi('guard') + '<i>長押し</i>', 'ガード', '正面のパンチを防ぐ（掴みは防げない）')),
+      card('掴み・投げ', '#f97316',
+        row(bi('grab') + '<i>長押し</i>', '掴む', '0.5秒以上で持ち上げる') +
+        row(ges('指を離す'), '投げる', 'カメラの向きへ投げる。場外の近くで投げると強い') +
+        row(bi('punch') + '<i>連打</i>', '掴まれたら振りほどく', 'ジャンプの連打でもOK')),
+      card('スキル', '#7c5cff',
+        row(ges('右上のスキル'), 'スキル', 'タップで使う。TPは5秒ごとに1ずつ貯まる') +
+        row(ges('ピンクの枠'), 'キャラ固有アクション', 'バイク・大鎌・武器呼び出し・リズム（ヒロ）') +
+        row(ges('白い帯をタップ'), '選ぶ', 'ロール付与の状態異常・呼び出す武器を切り替え') +
+        row(ges('向き'), '狙うスキル', 'カメラの向きにいる相手を狙う')),
+      card('アイテム', '#16a34a',
+        row(ges('触れる'), '拾う', '手ぶらのときに近づくだけ') +
+        row(bi('use'), '使う', 'どのアイテムもこのボタン。AR・SRは長押し、SRは離して撃つ') +
+        row(bi('use') + '<i>長押し</i>', 'SSTを改造', 'TP20を使って改造SSTに') +
+        row(bi('drop'), '投げる', '当たると少しダメージ') +
+        row('<span class="tbi sq">交換</span>', '交換所', '交換券を持っているときだけ右上に出る')),
+      card('カメラ・その他', '#64748b',
+        row(ges('右側をドラッグ'), 'カメラを回す', '感度は「設定」で変えられる') +
+        row('<span class="tbi sq">Ⅱ</span>', '一時停止', '設定・ルール説明・タイトルへ') +
+        row('<span class="tbi sq">？</span>', 'この操作説明') +
+        row(ges('全画面'), '全画面にする', 'タイトルか一時停止メニューのボタンから')),
+    ].join('');
+    $('helpSet').textContent = 'ボタン設定';
+    $('helpTip').innerHTML = 'ボタンの大きさ・濃さ・左右の入れ替え、カメラ感度は「設定」で変えられます。PCのキー操作に戻したいときはタイトルの「📱 モバイル版」ボタンでオフにしてください。';
+    $('hint').textContent = '';
   }
   document.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => b.closest('.ov').classList.add('hidden')));
 
@@ -451,10 +513,12 @@
     S.faceSet = false;
     cam.yaw = 0; cam.pitch = 0.42;
     Sfx.bgm(true);
+    if (S.mobile) { show('touch'); touchReset(); goFull(false); }
+    checkRotate();
     requestLock();
-    setTimeout(() => { if (S.mode === 'game' && document.pointerLockElement !== canvas) { show('pause'); $('pauseNote').textContent = '画面をクリック（または「つづける」）で操作開始'; } }, 400);
+    setTimeout(() => { if (!S.mobile && S.mode === 'game' && document.pointerLockElement !== canvas) { show('pause'); $('pauseNote').textContent = '画面をクリック（または「つづける」）で操作開始'; } }, 400);
   }
-  function endGameView() { clearInterval(S.resTimer); $('arrows').innerHTML = ''; arrowEls.clear(); show('hud', false); show('result', false); show('gamechu', false); $('vig').className = ''; document.body.classList.remove('kyouki'); Sfx.bgm(false); }
+  function endGameView() { show('touch', false); show('rotate', false); touchReset(); clearInterval(S.resTimer); $('arrows').innerHTML = ''; arrowEls.clear(); show('hud', false); show('result', false); show('gamechu', false); $('vig').className = ''; document.body.classList.remove('kyouki'); Sfx.bgm(false); }
   function toTitle(keepErr) {
     if (!keepErr) $('tErr').textContent = '';
     Net.close();
@@ -469,7 +533,7 @@
   const canvas = $('c');
   // マウスの加速を切った生の移動量でロック（対応ブラウザのみ。だめなら普通にロック）
   function requestLock() {
-    if (S.mode !== 'game' || S.ended || S.shopOpen || !canvas.requestPointerLock) return;
+    if (S.mobile || S.mode !== 'game' || S.ended || S.shopOpen || !canvas.requestPointerLock) return;
     try {
       const r = canvas.requestPointerLock({ unadjustedMovement: true });
       if (r && r.catch) r.catch(() => { try { const r2 = canvas.requestPointerLock(); if (r2 && r2.catch) r2.catch(() => {}); } catch (e) { /* noop */ } });
@@ -484,6 +548,7 @@
     if (locked) { show('pause', false); S.paused = false; }
   });
   $('bResume').onclick = () => { show('pause', false); S.paused = false; requestLock(); };
+  function openPause() { show('pause'); $('pauseNote').textContent = S.role === 'solo' ? 'ゲームは一時停止しています' : 'オンライン対戦中はゲームは止まりません'; S.paused = S.role === 'solo'; touchReset(); }
   $('bHelp2').onclick = () => show('help');
   $('bSet3').onclick = () => Settings.open();
   $('helpSet').onclick = () => { $('help').classList.add('hidden'); Settings.open(); };
@@ -511,7 +576,11 @@
       return;
     }
     if (keys[code]) return; keys[code] = true;
-    for (const a of Settings.actionsFor(code)) {
+    for (const a of Settings.actionsFor(code)) actDown(a);
+  }
+  // 操作（キー・マウス・タッチ共通）
+  function actDown(a) {
+    {
       if (HOLD[a]) input.b[a] = true;
       if (a === 'jump') bump('jump');
       if (a === 'punch') bump('punch');
@@ -529,10 +598,11 @@
   }
   function release(code) {
     keys[code] = false;
-    for (const a of Settings.actionsFor(code)) {
-      if (HOLD[a]) input.b[a] = false;
-      if (a === 'use') input.useHold = false;
-    }
+    for (const a of Settings.actionsFor(code)) actUp(a);
+  }
+  function actUp(a) {
+    if (HOLD[a]) input.b[a] = false;
+    if (a === 'use') input.useHold = false;
   }
   document.addEventListener('mousedown', (e) => {
     if (S.mode !== 'game' || document.pointerLockElement !== canvas) return;
@@ -548,11 +618,132 @@
   });
   document.addEventListener('keyup', (e) => release(e.code));
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; input.b = {}; input.useHold = false; });
+  // ---------- モバイル版（タッチ操作）----------
+  const stick = { id: null, ox: 0, oy: 0, f: 0, r: 0 };
+  const camTouch = { id: null, x: 0, y: 0 };
+  const btnTouch = new Map(); // pointerId -> action
+  function applyMobile() {
+    const st = Settings.get();
+    S.mobile = Settings.isMobile();
+    const B = document.body;
+    B.classList.toggle('mobile', S.mobile); B.classList.toggle('tswap', S.mobile && !!st.tSwap);
+    B.style.setProperty('--ts', st.tSize); B.style.setProperty('--ta', st.tAlpha);
+    // スキル欄と選択表示はモバイル版ではタッチできる場所へ移す
+    const sk = $('hSk'), sel = $('hSel');
+    if (S.mobile) { if (sk.parentNode !== $('tSkWrap')) $('tSkWrap').appendChild(sk); if (sel.parentNode !== $('touch')) $('touch').appendChild(sel); }
+    else { const me = document.querySelector('#hud .me'); if (sk.parentNode !== me) me.insertBefore(sk, me.querySelector('.slot')); if (sel.parentNode !== $('hud')) $('hud').insertBefore(sel, $('hud').querySelector('.cross')); }
+    const MN = { auto: '自動', on: 'オン', off: 'オフ' };
+    $('bMobile').textContent = `📱 モバイル版：${MN[st.mobileMode]}${st.mobileMode === 'auto' ? (S.mobile ? '（オン）' : '（オフ）') : ''}`;
+    const canFull = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+    show('bFull', S.mobile && canFull); show('bFull2', S.mobile && canFull);
+    $('shopNote').textContent = S.mobile ? 'アイテムをタップで交換' : '数字キーかクリックで交換 ／ T か Esc でとじる';
+    $('slotKeys').textContent = `アイテム [${Settings.key('use')}]使う [${Settings.key('drop')}]投げる`;
+    if (S.mode === 'game') { show('touch', S.mobile); if (S.mobile && document.pointerLockElement) document.exitPointerLock(); }
+  }
+  $('bMobile').onclick = () => {
+    const order = ['auto', 'on', 'off'], cur = Settings.get().mobileMode;
+    Settings.setMobileMode(order[(order.indexOf(cur) + 1) % 3]); Sfx.play('click');
+    toast(Settings.isMobile() ? 'モバイル版（タッチ操作）にしました' : 'PC版（キーボード・マウス）にしました', 1400);
+  };
+  function goFull(force) {
+    if (!force && !Settings.get().tFull) return;
+    const d = document.documentElement;
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    try {
+      const r = (d.requestFullscreen || d.webkitRequestFullscreen).call(d, { navigationUI: 'hide' });
+      const lock = () => { try { const o = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (o && o.catch) o.catch(() => {}); } catch (e) { /* noop */ } };
+      if (r && r.then) r.then(lock).catch(() => {}); else lock();
+    } catch (e) { /* noop */ }
+  }
+  $('bFull').onclick = () => goFull(true);
+  $('bFull2').onclick = () => goFull(true);
+  function touchReset() {
+    for (const a of btnTouch.values()) actUp(a);
+    btnTouch.clear(); stick.id = null; stick.f = stick.r = 0; camTouch.id = null;
+    show('tStick', false);
+    document.querySelectorAll('#touch .tb.on, #touch .skill.on').forEach((b) => b.classList.remove('on'));
+  }
+  function checkRotate() { show('rotate', S.mobile && S.mode === 'game' && window.innerHeight > window.innerWidth * 1.05); }
+  window.addEventListener('resize', checkRotate);
+  window.addEventListener('orientationchange', () => setTimeout(checkRotate, 300));
+  const tl = $('touch');
+  // タッチした場所で何を操作するか決める
+  function touchTarget(el) {
+    const b = el.closest && el.closest('[data-a],[data-ui],.skill,#hSel');
+    if (!b || !tl.contains(b)) return null;
+    if (b.dataset.a) return { a: b.dataset.a, el: b };
+    if (b.dataset.ui) return { ui: b.dataset.ui, el: b };
+    if (b.id === 'hSel') return { ui: 'sel', el: b };
+    if (b.id === 'skV') return { a: CHARS[S.myChar] && CHARS[S.myChar].passive.special === 'rhythm' ? 'g' : 'v', el: b };
+    const m = /^sk(\d)$/.exec(b.id); if (m) return { a: 's' + (+m[1] + 1), el: b };
+    return null;
+  }
+  tl.addEventListener('pointerdown', (e) => {
+    if (!S.mobile || S.mode !== 'game') return;
+    e.preventDefault(); Sfx.init();
+    if (Settings.get().tFull) goFull(false);
+    const t = touchTarget(e.target);
+    if (t) {
+      if (t.ui === 'pause') { openPause(); return; }
+      if (t.ui === 'help') { show('help'); return; }
+      if (t.ui === 'sel') { input.sel = (input.sel + 1) % 110; Sfx.play('click'); return; }
+      if (S.paused) return;
+      btnTouch.set(e.pointerId, t.a); t.el.classList.add('on');
+      try { tl.setPointerCapture(e.pointerId); } catch (er) { /* noop */ }
+      actDown(t.a);
+      if (navigator.vibrate) try { navigator.vibrate(8); } catch (er) { /* noop */ }
+      return;
+    }
+    const W = window.innerWidth;
+    const stickSide = Settings.get().tSwap ? e.clientX > W * 0.6 : e.clientX < W * 0.4;
+    if (stickSide && stick.id === null) {
+      stick.id = e.pointerId; stick.ox = e.clientX; stick.oy = e.clientY; stick.f = stick.r = 0;
+      const el = $('tStick'); el.style.left = e.clientX + 'px'; el.style.top = e.clientY + 'px'; show('tStick');
+      el.querySelector('.knob').style.transform = 'translate(-50%,-50%)';
+    } else if (camTouch.id === null) { camTouch.id = e.pointerId; camTouch.x = e.clientX; camTouch.y = e.clientY; }
+    else return;
+    try { tl.setPointerCapture(e.pointerId); } catch (er) { /* noop */ }
+  }, { passive: false });
+  tl.addEventListener('pointermove', (e) => {
+    if (e.pointerId === stick.id) {
+      const R = 56 * Settings.get().tSize;
+      let dx = e.clientX - stick.ox, dy = e.clientY - stick.oy; const d = Math.hypot(dx, dy);
+      // 指が大きく離れたらスティックの中心もついてくる
+      if (d > R * 1.6) { const k = (d - R * 1.6) / d; stick.ox += dx * k; stick.oy += dy * k; dx = e.clientX - stick.ox; dy = e.clientY - stick.oy; const el = $('tStick'); el.style.left = stick.ox + 'px'; el.style.top = stick.oy + 'px'; }
+      const dd = Math.min(R, Math.hypot(dx, dy)), a = Math.atan2(dy, dx);
+      const kx = Math.cos(a) * dd, ky = Math.sin(a) * dd;
+      $('tStick').querySelector('.knob').style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
+      const m = dd / R < 0.15 ? 0 : dd / R; // 中心付近は遊び
+      stick.r = Math.cos(a) * m; stick.f = -Math.sin(a) * m;
+    } else if (e.pointerId === camTouch.id) {
+      const st = Settings.get(), dx = e.clientX - camTouch.x, dy = e.clientY - camTouch.y;
+      camTouch.x = e.clientX; camTouch.y = e.clientY;
+      if (Math.abs(dx) > 200 || Math.abs(dy) > 200) return;
+      cam.yaw -= dx * 0.0062 * st.tSens;
+      cam.pitch = Math.max(-0.15, Math.min(1.25, cam.pitch + dy * 0.005 * st.tSens * (st.tInvertY ? -1 : 1)));
+    }
+  });
+  function tEnd(e) {
+    if (btnTouch.has(e.pointerId)) {
+      const a = btnTouch.get(e.pointerId); btnTouch.delete(e.pointerId); actUp(a);
+      document.querySelectorAll(`#touch [data-a="${a}"].on`).forEach((b) => b.classList.remove('on'));
+      document.querySelectorAll('#touch .skill.on').forEach((b) => b.classList.remove('on'));
+    }
+    if (e.pointerId === stick.id) { stick.id = null; stick.f = stick.r = 0; show('tStick', false); }
+    if (e.pointerId === camTouch.id) camTouch.id = null;
+  }
+  tl.addEventListener('pointerup', tEnd); tl.addEventListener('pointercancel', tEnd); tl.addEventListener('lostpointercapture', tEnd);
+  tl.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) touchReset(); });
+
+  applyMobile(); updateKeyTexts();
   function buildInput() {
     const K = Settings.get().keys;
     let f = 0, r = 0;
     if (keys[K.fwd]) f += 1; if (keys[K.back]) f -= 1;
     if (keys[K.right]) r += 1; if (keys[K.left]) r -= 1;
+    if (S.mobile && stick.id !== null) { f += stick.f; r += stick.r; }
+    const m = Math.hypot(f, r); if (m > 1) { f /= m; r /= m; }
     if (keys[K.camL]) cam.yaw += 0.04 * Settings.get().sens; if (keys[K.camR]) cam.yaw -= 0.04 * Settings.get().sens;
     const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), rx = -fz, rz = fx;
     input.mx = fx * f + rx * r; input.mz = fz * f + rz * r;
@@ -571,6 +762,7 @@
     $('shopGrid').querySelectorAll('.it').forEach((d) => (d.onclick = () => buy(d.dataset.k)));
   }
   function closeShop() { S.shopOpen = false; show('shop', false); requestLock(); }
+  $('shopClose').onclick = () => closeShop();
   function buy(item) { input.buy = { seq: (input.buy ? input.buy.seq : 0) + 1, item }; Sfx.play('pickup'); closeShop(); }
 
   // ---------- HUD ----------
@@ -630,12 +822,17 @@
     }
     if (C.passive.special === 'rhythm') { const c = $('spCD'); if (c) { c.classList.toggle('hidden', me.rh === 0); c.textContent = me.rh + '/8'; } }
     $('hItem').textContent = me.it ? ITEMS[me.it].name + (ITEMS[me.it].weapon ? ' ×' + me.am : '') : 'なし';
-    $('hTk').textContent = me.tk ? `交換券 ×${me.tk}　[T]で使う` : `交換券まで あと${3 - me.tkp}撃墜`;
+    $('hTk').textContent = me.tk ? `交換券 ×${me.tk}　[${Settings.key('shop')}]で使う` : `交換券まで あと${3 - me.tkp}撃墜`;
+    if (S.mobile) {
+      show('tShop', me.tk > 0);
+      const ub = document.querySelector('#tBtns [data-a="use"]'), lbl = me.it ? ITEMS[me.it].name + (ITEMS[me.it].weapon ? ' ×' + me.am : '') : '';
+      if (ub.dataset.l !== lbl) { ub.dataset.l = lbl; ub.innerHTML = '使う' + (lbl ? `<small>${esc(lbl)}</small>` : ''); ub.classList.toggle('has', !!lbl); }
+    }
     // 選択表示
     let sel = '';
-    if (me.c === 'ayu') sel = 'ロール付与：' + STATUS[RANDOM_POOL[input.sel % RANDOM_POOL.length]].name + '（ホイールで変更）';
-    if (me.c === 'takara') sel = '呼び出す武器：' + ['AR', 'SR', 'SG'][input.sel % 3] + '（ホイールで変更）';
-    if (me.it === 'sst') sel = 'SST：Eで使う（30%）／E長押し＋TP20で改造';
+    if (me.c === 'ayu') sel = 'ロール付与：' + STATUS[RANDOM_POOL[input.sel % RANDOM_POOL.length]].name + (S.mobile ? '（タップで変更）' : '（ホイールで変更）');
+    if (me.c === 'takara') sel = '呼び出す武器：' + ['AR', 'SR', 'SG'][input.sel % 3] + (S.mobile ? '（タップで変更）' : '（ホイールで変更）');
+    if (me.it === 'sst') sel = `SST：[${Settings.key('use')}]で使う（30%）／長押し＋TP20で改造`;
     show('hSel', !!sel); $('hSel').textContent = sel;
     // 状態異常
     $('sts').innerHTML = me.st.map((x) => `<span class="chip" style="background:${STATUS[x[0]].color}">${STATUS[x[0]].name}${x[2] > 1 ? ' Lv' + x[2] : ''} ${Math.ceil(x[1])}s${x[0] === 'keyboard' ? '（' + { punch: 'パンチ', grab: '掴み', jump: 'ジャンプ', dash: 'ダッシュ' }[x[3]] + '不可）' : ''}</span>`).join('')
@@ -643,7 +840,7 @@
       + (me.ca ? `<span class="chip" style="background:#fda4af">キャシー塚本 ×${me.ca}</span>` : '')
       + (me.bd ? `<span class="chip" style="background:#3b82f6">縛られ中</span>` : '')
       + (me.cb ? `<span class="chip" style="background:#7c3aed">操作を乗っ取られ中！</span>` : '')
-      + (me.ct ? `<span class="chip" style="background:#7c3aed">相手を操作中（WASD）</span>` : '');
+      + (me.ct ? `<span class="chip" style="background:#7c3aed">相手を操作中（${S.mobile ? 'スティック' : 'WASD'}）</span>` : '');
     // 復帰／脱落
     show('hResp', me.e || me.rs > 0);
     $('hResp').innerHTML = me.e ? '脱落…<div style="font-size:22px">観戦中</div>' : '復帰まで ' + Math.ceil(me.rs);
@@ -680,7 +877,7 @@
     for (const [id, el] of arrowEls) if (!seen.has(id)) { el.remove(); arrowEls.delete(id); }
   }
   function renderSkills(me) {
-    const C = CHARS[me.c];
+    const C = CHARS[me.c]; S.myChar = me.c;
     let h = C.skills.map((sk, i) => `<div class="skill" id="sk${i}"><span class="k">${Settings.key('s' + (i + 1))}</span><div class="n">${sk.name}</div><div class="c">TP ${sk.tp}</div></div>`).join('');
     if (C.passive.special) h += `<div class="skill sp" id="skV"><span class="k">${Settings.key(C.passive.special === 'rhythm' ? 'g' : 'v')}</span><div class="n">${C.passive.name}</div><div class="c">${C.passive.special === 'rhythm' ? 'リズム' : 'CT ' + C.passive.cd + '秒'}</div><div class="cd hidden" id="spCD"></div></div>`;
     $('hSk').innerHTML = h;
