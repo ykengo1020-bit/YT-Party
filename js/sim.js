@@ -19,6 +19,10 @@ window.Sim = (function () {
       this.lives = opts.lives || 2;
       this.map = GD.MAPS[opts.map] ? opts.map : 'arena';
       this.teamMode = !!opts.teamMode; this.ff = !!opts.ff;
+      // 出るアイテム（ロビーで選択）と出現量 0:なし 1:少なめ 2:普通 3:多め
+      this.itemPool = (opts.items || SPAWN_ITEMS).filter((k) => SPAWN_ITEMS.includes(k));
+      this.itemRate = opts.itemRate === undefined ? 2 : opts.itemRate;
+      this.shopList = this.itemPool.concat('sst');
       this.t = 0; this.tick = 0;
       this.players = []; this.items = []; this.proj = []; this.boxes = [];
       this.fx = [];
@@ -124,7 +128,7 @@ window.Sim = (function () {
         spCD: 0, rhythm: [], rhythmCD: 0, voice: false, positive: false, cathy: null, mtHP: 0,
         ctrl: null, ctrlBy: null, minion: false, crouchT: 0, chewT: 0,
         hist: [], posHist: [], lastC: {}, input: emptyInput(),
-        timers: { pas: c.name === 'kenken' ? 30 : 20, yu: 30, g5: 10, lag: 4, chew: 4 },
+        timers: { pas: 20, yu: 45, g5: 10, lag: 4, chew: 4 },
         hitBy: {}, ai: { t: 0 }, onPlat: -1, dropT: 0, nextStun: 100,
       };
       this.players.push(p);
@@ -148,7 +152,7 @@ window.Sim = (function () {
     stat(p, k) { // 0 power,1 speed,2 weight
       let v = CHARS[p.char].stats[k] + p.perm[k] + p.cot[k];
       if (p.buffs.ken && p.buffs.ken.k === k) v += 1;
-      if (p.buffs.mt) v += [2, -1, 3][k];
+      if (p.buffs.mt) v += [1, -1, 2][k];
       if (p.minion) v = 1;
       return clamp(v, 1, 8);
     }
@@ -222,7 +226,7 @@ window.Sim = (function () {
         }
       }
       if (t.buffs.rhythmrev) { heroAdd = 0; kb *= 0.35; }
-      if (t.buffs.mt) { t.mtHP -= heroAdd; heroAdd *= 0.2; if (t.mtHP <= 0) { delete t.buffs.mt; this.emit({ k: 'txt', id: t.id, s: 'MT大破！', c: '#f87171' }); this.emit({ k: 'boom', x: t.x, y: t.y + 1, z: t.z }); } }
+      if (t.buffs.mt) { t.mtHP -= heroAdd; heroAdd *= 0.5; if (t.mtHP <= 0) { delete t.buffs.mt; this.emit({ k: 'txt', id: t.id, s: 'MT大破！', c: '#f87171' }); this.emit({ k: 'boom', x: t.x, y: t.y + 1, z: t.z }); } }
       if (t.ledge) { t.ledge = null; t.ledgeCD = 0.6; }
       if (t.grab) this.release(t, false);
       t.hero = clamp(t.hero + heroAdd, 0, 999);
@@ -299,15 +303,15 @@ window.Sim = (function () {
     // ---------- 掴み ----------
     release(p, throwIt) {
       const t = this.players.find((q) => q.id === p.grab);
-      p.grab = null; p.grabCD = 0.4;
+      p.grab = null; p.grabCD = 1.1;
       if (!t) return;
       t.grabbedBy = null; t.escape = 0;
       if (throwIt) {
-        let pw = (5 + (p.grabT > 0.5 ? 2.5 : 0)) * this.powerMul(p);
+        let pw = (4 + (p.grabT > 0.5 ? 2 : 0)) * this.powerMul(p);
         if (this.has(p, 'kyouki')) pw *= 2;
         const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
         t.inv = 0;
-        this.hit(t, p, 10, pw, fx, fz, 0.5, { unblock: true, noCathy: false });
+        this.hit(t, p, 8, pw, fx, fz, 0.5, { unblock: true, noCathy: false });
         t.thrown = 0.3;
         p.tp = Math.min(30, p.tp + 1);
         this.emit({ k: 'sfx', n: 'throw' });
@@ -334,7 +338,7 @@ window.Sim = (function () {
           if (this.marsInFront(p, 10)) this.damageMars(p, 3);
           this.applyStatus(p, 'majigire', 1, { force: true, dur: 30 });
           break;
-        case 'subaka': p.cathy = { n: 3, t: 100 }; this.emit({ k: 'txt', id: p.id, s: 'キャシー塚本 召喚！', c: '#fda4af' }); break;
+        case 'subaka': p.cathy = { n: 2, t: 40, save: 1 }; this.emit({ k: 'txt', id: p.id, s: 'キャシー塚本 召喚！', c: '#fda4af' }); break;
         case 'soundboard': all((q) => { const c = q.char === 'nimo' ? 1 : 0.7; if (rnd() < c) { this.applyStatus(q, 'lag', q.char === 'nimo' ? 1 : 1); this.applyStatus(q, 'nanchou'); } }); this.statusMars(0.7); break;
         case 'role': { const q = this.aimTarget(p); if (q) this.applyStatus(q, RANDOM_POOL[p.input.sel % RANDOM_POOL.length]); else this.statusMars(1); break; }
         case 'chudoku': this.players.forEach((q) => !q.elim && !this.ally(p, q) && this.applyStatus(q, 'gamechu', 0.8)); this.statusMars(0.8); break;
@@ -342,7 +346,7 @@ window.Sim = (function () {
         case 'rhythmrev': p.buffs.rhythmrev = 40; break;
         case 'goreisan': p.st = {}; this.emit({ k: 'txt', id: p.id, s: 'スッキリ！', c: '#86efac' }); break;
         case 'mousou':
-          if (rnd() < 0.5) { p.buffs.tpx2 = 60; this.emit({ k: 'txt', id: p.id, s: '楽しい妄想！TP2倍', c: '#fbcfe8' }); }
+          if (rnd() < 0.65) { p.buffs.tpx2 = 60; p.buffs.ken = { k: 0, t: 60 }; this.emit({ k: 'txt', id: p.id, s: '楽しい妄想！TP2倍＆パワーUP', c: '#fbcfe8' }); }
           else { if (p.tp >= 3) p.tp -= 3; else { p.tp = 0; p.hero = clamp(p.hero + 40, 0, 999); } this.emit({ k: 'txt', id: p.id, s: '嫌な事を思い出した…', c: '#94a3b8' }); }
           break;
         case 'rinri': this.applyStatus(p, 'kyouki', 1, { force: true }); break;
@@ -371,15 +375,15 @@ window.Sim = (function () {
         }
         case 'build': {
           const fx = p.x, fz = p.z, fy = p.y;
-          const life = 60;
+          const life = 25;
           this.boxes.push({ x: fx, z: fz, w: 1.4, d: 1.4, top: fy - 0.05, bot: fy - 0.6, life, kind: 'build' });
           for (let k = 0; k < 4; k++) {
             const a = (k / 4) * Math.PI * 2 + p.yaw;
             const cx = fx + Math.sin(a) * 2.2, cz = fz + Math.cos(a) * 2.2;
             const along = Math.abs(Math.sin(a)) > 0.7;
-            this.boxes.push({ x: cx, z: cz, w: along ? 0.3 : 1.2, d: along ? 1.2 : 0.3, top: fy + 1.3, bot: fy - 0.6, life, kind: 'build' });
+            this.boxes.push({ x: cx, z: cz, w: along ? 0.3 : 1.2, d: along ? 1.2 : 0.3, top: fy + 1.0, bot: fy - 0.6, life, kind: 'build' });
           }
-          if (rnd() < 2 / 3) { p.lives = Math.min(this.lives, p.lives + 1); p.tp = Math.min(30, p.tp + 5); this.emit({ k: 'txt', id: p.id, s: '建築完了！ライフ+1 TP+5', c: '#fde047' }); }
+          if (rnd() < 0.6) { p.hero = Math.max(0, p.hero - 25); p.tp = Math.min(30, p.tp + 3); this.emit({ k: 'txt', id: p.id, s: '建築完了！ヘロヘロ-25% TP+3', c: '#fde047' }); }
           else {
             const who = pick(this.players.filter((q) => q !== p)) || p;
             this.emit({ k: 'txt', id: p.id, s: CHARS[who.char].name + 'に爆破された！', c: '#f97316' });
@@ -390,7 +394,7 @@ window.Sim = (function () {
           break;
         }
         case 'edit':
-          if (rnd() < 2 / 3) { all((q) => this.hit(q, p, 40, 3, q.x - p.x, q.z - p.z, 0.3, { unblock: true })); if (this.mars) this.damageMars(p, 3); }
+          if (rnd() < 2 / 3) { all((q) => this.hit(q, p, 25, 2.5, q.x - p.x, q.z - p.z, 0.3, { unblock: true })); if (this.mars) this.damageMars(p, 3); }
           else { p.hero = clamp(p.hero + 20, 0, 999); this.emit({ k: 'txt', id: p.id, s: '撮影データが消し飛んだ', c: '#9ca3af' }); }
           break;
         case 'snipe': {
@@ -399,9 +403,9 @@ window.Sim = (function () {
           else if (this.mars) this.damageMars(p, 6);
           break;
         }
-        case 'mt': p.buffs.mt = 40; p.mtHP = 100; this.emit({ k: 'txt', id: p.id, s: 'MT搭乗！', c: '#94a3b8' }); break;
-        case 'sherpa': p.hero = 0; p.buffs.tpx2 = 40; this.emit({ k: 'txt', id: p.id, s: '補給完了！', c: '#86efac' }); break;
-        case 'muku': { const q = this.aimTarget(p); if (q) this.applyStatus(q, 'tapioka', 1); break; }
+        case 'mt': p.buffs.mt = 20; p.mtHP = 60; this.emit({ k: 'txt', id: p.id, s: 'MT搭乗！', c: '#94a3b8' }); break;
+        case 'sherpa': p.hero = Math.max(0, p.hero - 35); p.buffs.tpx2 = 40; this.emit({ k: 'txt', id: p.id, s: '補給完了！', c: '#86efac' }); break;
+        case 'muku': { const q = this.aimTarget(p); if (q) this.applyStatus(q, 'tapioka', 1, { dur: 8 }); break; }
         case 'positive': p.positive = true; p.perm = p.perm.map((v) => v + 1); this.emit({ k: 'txt', id: p.id, s: '全ステータスUP！', c: '#fde047' }); break;
       }
     }
@@ -410,13 +414,13 @@ window.Sim = (function () {
       const sp = CHARS[p.char].passive.special;
       if (!sp || sp === 'rhythm') return;
       if (p.spCD > 0) { this.emit({ k: 'deny', id: p.id }); return; }
-      if (sp === 'bike') { p.buffs.bike = 10; p.spCD = 60; this.emit({ k: 'txt', id: p.id, s: 'バイク召喚！', c: '#fb923c' }); this.emit({ k: 'sfx', n: 'bike' }); }
+      if (sp === 'bike') { p.buffs.bike = 6; p.spCD = 70; this.emit({ k: 'txt', id: p.id, s: 'バイク召喚！', c: '#fb923c' }); this.emit({ k: 'sfx', n: 'bike' }); }
       if (sp === 'weapon') { if (p.item) this.dropItem(p); const w = ['ar', 'sr', 'sg'][p.input.sel % 3]; this.giveItem(p, w); p.spCD = 40; }
       if (sp === 'scythe') {
         const ay = p.input.ay, ap = clamp(p.input.ap, -0.4, 1.2);
         const s = 19;
         p.vx = Math.sin(ay) * Math.cos(ap) * s; p.vz = Math.cos(ay) * Math.cos(ap) * s; p.vy = Math.sin(ap) * s + 4;
-        p.yaw = ay; p.ledge = null; p.dashT = 0.3; p.spCD = 45; p.scy = 0.4;
+        p.yaw = ay; p.ledge = null; p.dashT = 0.3; p.spCD = 80; p.scy = 0.4;
         this.emit({ k: 'txt', id: p.id, s: '大鎌！', c: '#ef4444' }); this.emit({ k: 'sfx', n: 'dash' });
       }
     }
@@ -522,11 +526,12 @@ window.Sim = (function () {
       p.item = null; p.ammo = 0;
       if (p.minion) { p.elim = true; p.minion = false; return; }
       p.lives--;
-      if (p.lives <= 0 && p.char === 'wikitto' && !p.voice) {
-        p.voice = true; p.lives = 1;
+      let keepHero = -1;
+      if (p.lives <= 0 && p.char === 'wikitto' && !p.voice && p.tp >= 10) {
+        p.voice = true; p.tp -= 10; p.lives = 1; keepHero = Math.min(999, Math.max(80, p.hero + 70));
         this.emit({ k: 'txt', id: p.id, s: 'きれいな声で持ちこたえた！', c: '#f9a8d4' });
       }
-      p.hero = 0; p.nextStun = 100; p.stun = 0; p.st = {}; p.buffs = {}; p.cot = [0, 0, 0]; p.cathy = null; p.ledge = null; p.ctrl = null;
+      p.hero = keepHero > 0 ? keepHero : 0; p.nextStun = keepHero > 0 ? Math.floor(keepHero / 50) * 50 + 50 : 100; p.stun = 0; p.st = {}; p.buffs = {}; p.cot = [0, 0, 0]; p.cathy = null; p.ledge = null; p.ctrl = null;
       p.vx = p.vy = p.vz = 0;
       if (p.lives <= 0) {
         p.elim = true; p.lives = 0;
@@ -632,7 +637,8 @@ window.Sim = (function () {
         alive.forEach((p, k) => { p.item = its[k][0]; p.ammo = its[k][1]; });
         this.say('イベント：アイテムシャッフル！', '#c4b5fd');
       } else if (r < 0.17) {
-        for (let k = 0; k < Math.max(2, alive.length); k++) this.spawnItem(pick(['monitor', 'detox', 'lan', 'chair', 'energy', 'goreisan']));
+        const pool = this.itemPool.filter((k) => !['ar', 'sr', 'sg'].includes(k)); if (!pool.length || !this.itemRate) return;
+        for (let k = 0; k < Math.max(2, alive.length); k++) this.spawnItem(pick(pool));
         this.say('イベント：アイテム配布！', '#fde68a');
       } else if (r < 0.22) {
         this.blackout = 15; this.say('イベント：停電！', '#64748b'); this.emit({ k: 'sfx', n: 'blackout' });
@@ -686,7 +692,7 @@ window.Sim = (function () {
       if (this.blackout > 0) { this.blackout -= dt; if (this.blackout <= 0) { this.players.forEach((p) => { if (!p.elim) p.tp = Math.min(30, p.tp + 5); }); this.say('停電復旧：みんな休めた（TP+5）', '#fde68a'); } }
       // アイテム湧き
       this.itemT -= dt;
-      if (this.itemT <= 0) { this.itemT = 7 + rnd() * 5; if (this.items.length < 4) this.spawnItem(pick(SPAWN_ITEMS)); }
+      if (this.itemT <= 0) { const rt = this.itemRate; this.itemT = [99, 14, 7, 3.5][rt] + rnd() * [0, 6, 5, 2.5][rt]; if (rt && this.itemPool.length && this.items.length < [0, 2, 4, 7][rt]) this.spawnItem(pick(this.itemPool)); }
       if (this.mars) {
         this.sstT -= dt;
         const hasSST = this.items.some((i) => ITEMS[i.type].cookie) || this.players.some((p) => p.item && ITEMS[p.item].cookie);
@@ -741,9 +747,9 @@ window.Sim = (function () {
       // ヘロヘロ自然回復
       // パッシブ
       p.timers.pas -= dt;
-      if (p.char === 'kenken' && p.timers.pas <= 0) { p.timers.pas = 30; const k = (rnd() * 3) | 0; p.buffs.ken = { k, t: 15 }; this.emit({ k: 'txt', id: p.id, s: ['パワー', 'スピード', '重さ'][k] + 'UP', c: '#93c5fd' }); }
+      if (p.char === 'kenken' && p.timers.pas <= 0) { p.timers.pas = 20; const k = (rnd() * 3) | 0; p.buffs.ken = { k, t: 15 }; this.emit({ k: 'txt', id: p.id, s: ['パワー', 'スピード', '重さ'][k] + 'UP', c: '#93c5fd' }); }
       if (p.char === 'cotton' && p.timers.pas <= 0) { p.timers.pas = 20; const k = (rnd() * 3) | 0; if (p.cot[k] < 3) { p.cot[k]++; this.emit({ k: 'txt', id: p.id, s: ['パワー', 'スピード', '重さ'][k] + '+1', c: '#e5e7eb' }); } }
-      if (p.char === 'yururu') { p.timers.yu -= dt; if (p.timers.yu <= 0) { p.timers.yu = 30; this.applyStatus(p, pick(['lag', 'keyboard', 'g5', 'nanchou']), 1, { force: true, dur: 10 }); } }
+      if (p.char === 'yururu') { p.timers.yu -= dt; if (p.timers.yu <= 0) { p.timers.yu = 45; this.applyStatus(p, pick(['lag', 'keyboard', 'g5', 'nanchou']), 1, { force: true, dur: 6 }); } }
       // 5G：腹痛
       if (this.has(p, 'g5')) { p.timers.g5 -= dt; if (p.timers.g5 <= 0) { p.timers.g5 = 10; p.crouchT = 2; this.emit({ k: 'txt', id: p.id, s: 'お腹が…', c: '#a16207' }); } }
       // 歯ごたえ
@@ -771,13 +777,16 @@ window.Sim = (function () {
       }
       const ctrlled = !!p.ctrlBy;
       // エッジ検出（自分の入力用カウンタ）
+      if (!p.cInit) { p.cInit = true; p.lastC = { ...(inp.c || {}) }; }
+      if (ctrlled && !p.ccInit) { p.ccInit = true; p.lastCC = { ...(inp.c || {}) }; }
+      if (!ctrlled) p.ccInit = false;
       const E = (k) => { const v = inp.c[k] || 0, l = (ctrlled ? p.lastCC || (p.lastCC = {}) : p.lastC)[k] || 0; (ctrlled ? p.lastCC : p.lastC)[k] = v; return v !== l && v > 0; };
       const ePunch = E('punch'), eJump = E('jump'), eHead = E('head'), eUse = E('use'), eDrop = E('drop'), eV = E('v'), eG = E('g');
       const eSk = [E('s1'), E('s2'), E('s3'), E('s4')];
       const b = inp.b || {};
       if (inp.buy && inp.buy.seq !== p.lastBuy) {
         p.lastBuy = inp.buy.seq;
-        if (p.ticket > 0 && GD.SHOP_ITEMS.includes(inp.buy.item) && (inp.buy.item !== 'sst' || this.mars)) { p.ticket--; if (p.item) this.dropItem(p); this.giveItem(p, inp.buy.item); }
+        if (p.ticket > 0 && this.shopList.includes(inp.buy.item) && (inp.buy.item !== 'sst' || this.mars)) { p.ticket--; if (p.item) this.dropItem(p); this.giveItem(p, inp.buy.item); }
       }
       // 掴まれている：もがく
       if (p.grabbedBy) {
@@ -785,7 +794,7 @@ window.Sim = (function () {
         if (!g || g.grab !== p.id) { p.grabbedBy = null; }
         else if (p.stun <= 0 && !p.ctrlBy) {
           if (ePunch || eJump || eHead || E('grabc')) p.escape++;
-          let need = 5 + Math.floor(p.hero / 35); if (this.has(g, 'hagotae')) need *= 2; if (this.has(g, 'kyouki')) need = 20;
+          let need = 4 + Math.floor(p.hero / 50); if (this.has(g, 'hagotae')) need *= 2; if (this.has(g, 'kyouki')) need = 20;
           if (p.escape >= need) { this.release(g, false); this.emit({ k: 'txt', id: p.id, s: '振りほどいた！', c: '#a7f3d0' }); }
         }
       }
@@ -856,17 +865,31 @@ window.Sim = (function () {
       // ガード
       p.guard = act && b.guard && !(this.has(p, 'majigire') && p.char !== 'yururu') && !p.grab;
 
-      // パンチ／武器
+      // 武器：「使う」ボタンで撃つ・振る
       const weapon = p.item && ITEMS[p.item].weapon ? p.item : null;
-      if (act && !p.guard && !this.disabled(p, 'punch')) {
-        if (weapon === 'ar') { if (b.punch && p.fireCD <= 0) { p.fireCD = 0.14; this.fireWeapon(p, 'ar'); } }
+      const useHeld = !!(b.use || inp.useHold);
+      if (weapon && act && (eUse || useHeld) && weapon !== 'monitor') p.yaw = inp.ay;
+      if (act && weapon) {
+        if (weapon === 'ar') { if (useHeld && p.fireCD <= 0) { p.fireCD = 0.14; this.fireWeapon(p, 'ar'); } }
         else if (weapon === 'sr') {
-          if (b.punch) p.srT += dt;
+          if (useHeld) p.srT += dt;
           else if (p.srT > 0) { if (p.srT > 0.6) this.fireWeapon(p, 'sr'); p.srT = 0; }
-        } else if (weapon === 'sg') { if (ePunch && p.fireCD <= 0) { p.fireCD = 0.7; this.fireWeapon(p, 'sg'); } }
-        else {
+        } else if (weapon === 'sg') { if (eUse && p.fireCD <= 0) { p.fireCD = 0.7; this.fireWeapon(p, 'sg'); } }
+        else if (weapon === 'monitor' && eUse && p.fireCD <= 0) {
+          p.fireCD = 0.55; p.punchT = 0.3; p.punchSide = 1; p.yaw = lerpAngle(p.yaw, inp.ay, 0.6);
+          let any = false;
+          for (const q of this.targetsInFront(p, 1.5, 0.3)) any = this.hit(q, p, 35, 7 * this.powerMul(p), q.x - p.x, q.z - p.z, 0.45, { unblock: true }) || any;
+          if (this.marsInFront(p, 1.6)) { this.damageMars(p, 'monitor'); any = true; }
+          this.emit({ k: 'sfx', n: any ? 'hit2' : 'swing2' });
+          if (any) { p.ammo--; if (p.ammo <= 0) p.item = null; }
+        }
+      } else p.srT = 0;
+
+      // パンチ（いつでも素手）
+      if (act && !p.guard && !this.disabled(p, 'punch')) {
+        {
           if (ePunch && p.punchCD <= 0) {
-            p.punchT = 0.25; p.punchSide ^= 1; p.punchCD = 0.36; p.punchHit = false; p.charging = 0; p.holdPunch = 1;
+            p.punchT = 0.25; p.punchSide ^= 1; p.punchCD = 0.3; p.punchHit = false; p.charging = 0; p.holdPunch = 1;
             p.yaw = lerpAngle(p.yaw, inp.ay, 0.5);
             if (!p.ground) { p.vx += Math.sin(p.yaw) * 6; p.vz += Math.cos(p.yaw) * 6; p.dropkick = 0.35; }
             this.emit({ k: 'sfx', n: 'swing' });
@@ -880,37 +903,46 @@ window.Sim = (function () {
           if (p.punchT > 0 && p.punchT < 0.17 && !p.punchHit) {
             p.punchHit = true;
             const chg = p.charged || 0; p.charged = 0;
-            let heroAdd = 4 + chg * 8, kb = 2.0 + chg * 5;
+            let heroAdd = 6 + chg * 9, kb = 2.4 + chg * 5.5;
             if (p.dropkick > 0) { heroAdd += 3; kb += 1.5; }
-            if (weapon === 'monitor') { heroAdd = 40; kb *= 1.8; }
+            // 3連続で当てるとコンボの締め（大きく吹っ飛ぶ）
+            const comboOk = this.t - (p.comboT || -9) < 0.9;
+            const fin = !chg && comboOk && (p.combo || 0) >= 2;
+            if (fin) { heroAdd += 4; kb *= 2.1; }
             const pm = this.powerMul(p);
             // 音楽ボット：ビートに合うと強化
             if (this.has(p, 'musicbot')) { const ph = (this.t % 0.5); if (ph < 0.12 || ph > 0.38) { const m = p.char === 'hiro' ? 2 : 1.5; heroAdd *= m; kb *= m; this.emit({ k: 'txt', id: p.id, s: '♪Perfect', c: '#ff7ad9' }); } }
             let any = false;
             for (const q of this.targetsInFront(p, 1.25, 0.35)) {
               if (q.gBug > 0) q.gFree = (q.gFree || 0) + 1;
-              any = this.hit(q, p, heroAdd * (chg ? 1.2 : 1), kb * pm, q.x - p.x, q.z - p.z, 0.3 + chg * 0.25) || any;
+              const ok = this.hit(q, p, heroAdd * (chg ? 1.2 : 1), kb * pm, q.x - p.x, q.z - p.z, fin ? 0.5 : 0.3 + chg * 0.25);
+              if (ok && !fin && !chg) q.hitstun = Math.max(q.hitstun, 0.32); // 連打がつながる
+              any = ok || any;
             }
-            if (this.marsInFront(p, 1.4)) { this.damageMars(p, weapon === 'monitor' ? 'monitor' : chg > 0.3 ? 2 : 1); any = true; }
-            if (weapon === 'monitor' && any) { p.ammo--; if (p.ammo <= 0) p.item = null; }
-            if (any) this.emit({ k: 'sfx', n: chg > 0.3 ? 'hit2' : 'hit' });
+            if (this.marsInFront(p, 1.4)) { this.damageMars(p, chg > 0.3 || fin ? 2 : 1); any = true; }
+            if (any) {
+              p.combo = fin || chg ? 0 : (comboOk ? (p.combo || 0) + 1 : 1); p.comboT = this.t;
+              if (fin) this.emit({ k: 'txt', id: p.id, s: 'コンボ！', c: '#fbbf24' });
+              this.emit({ k: 'sfx', n: chg > 0.3 || fin ? 'hit2' : 'hit' });
+            }
           }
         }
-      } else if (!b.punch) { p.holdPunch = 0; p.charging = 0; p.srT = 0; }
+      } else if (!b.punch) { p.holdPunch = 0; p.charging = 0; }
       if (p.dropkick) p.dropkick = Math.max(0, p.dropkick - dt);
 
       // 頭突き
       if (act && eHead && p.headCD <= 0) {
         p.headT = 0.3; p.headCD = 1.1;
         let any = false;
-        for (const q of this.targetsInFront(p, 1.0, 0.5)) any = this.hit(q, p, 10, 1.6 * this.powerMul(p), q.x - p.x, q.z - p.z, 0.2) || any;
+        for (const q of this.targetsInFront(p, 1.0, 0.5)) any = this.hit(q, p, 13, 2.0 * this.powerMul(p), q.x - p.x, q.z - p.z, 0.25) || any;
         if (this.marsInFront(p, 1.2)) { this.damageMars(p, 2); any = true; }
         if (any) this.emit({ k: 'sfx', n: 'hit2' }); else this.emit({ k: 'sfx', n: 'swing' });
       }
 
       // 掴み
-      if (act && b.grab && !p.grab && p.grabCD <= 0 && !this.disabled(p, 'grab') && !weapon) {
-        const cands = this.targetsInFront(p, 1.05, 0.2).filter((q) => !q.grabbedBy && q.inv <= 0 && !q.grab && !this.ally(p, q));
+      if (act && b.grab && !p.grab && p.grabCD <= 0 && !this.disabled(p, 'grab')) {
+        p.grabCD = 0.5; // 空振りにも隙
+        const cands = this.targetsInFront(p, 0.9, 0.3).filter((q) => !q.grabbedBy && q.inv <= 0 && !q.grab && !this.ally(p, q));
         if (cands.length) {
           const q = cands[0];
           if (q.cathy && q.cathy.n > 0) { this.cathyAbsorb(q); p.grabCD = 0.6; }
@@ -931,15 +963,20 @@ window.Sim = (function () {
           q.x = p.x + fx * 0.85; q.z = p.z + fz * 0.85; q.y = p.y + (lift ? 1.5 : 0.25);
           q.vx = p.vx; q.vy = 0; q.vz = p.vz; q.yaw = p.yaw + Math.PI;
           if (!b.grab || !act) this.release(p, act);
-          else if (p.grabT > 4.5) this.release(p, false);
+          else if (p.grabT > 3.5) this.release(p, false);
         }
       }
 
       // アイテム使用・投げ
-      if (act && eUse) this.useItem(p);
+      if (act && eUse && p.item && !ITEMS[p.item].weapon && p.item !== 'sst') this.useItem(p);
       if (act && eDrop) this.dropItem(p);
       // SST改造：E長押し＋TP20
-      if (p.item === 'sst' && inp.useHold) { p.useT += dt; if (p.useT > 1 && p.tp >= 20) { p.tp -= 20; p.item = 'sst2'; p.useT = 0; this.emit({ k: 'txt', id: p.id, s: '改造SST"Super Savage Terminator"完成！', c: '#f43f5e' }); } } else p.useT = 0;
+      if (p.item === 'sst') {
+        if (useHeld && act) {
+          p.useT += dt;
+          if (p.useT > 1 && !p.useUpg) { p.useUpg = true; if (p.tp >= 20) { p.tp -= 20; p.item = 'sst2'; this.emit({ k: 'txt', id: p.id, s: '改造SST"Super Savage Terminator"完成！', c: '#f43f5e' }); } else this.emit({ k: 'txt', id: p.id, s: '改造にはTP20が必要', c: '#9ca3af' }); }
+        } else { if (p.useT > 0 && p.useT <= 1 && act) this.useItem(p); p.useT = 0; p.useUpg = false; }
+      } else { p.useT = 0; p.useUpg = false; }
 
       // スキル
       if (act) for (let k = 0; k < 4; k++) if (eSk[k]) this.useSkill(p, k);
@@ -950,7 +987,7 @@ window.Sim = (function () {
         if (r.length && (now - r[r.length - 1] < 0.38 || now - r[r.length - 1] > 0.62)) r.length = 0;
         r.push(now);
         this.emit({ k: 'beat', id: p.id, n: r.length });
-        if (r.length >= 8) { r.length = 0; if (p.rhythmCD <= 0) { p.rhythmCD = 15; if (p.item) this.dropItem(p); this.giveItem(p, pick(GD.SPAWN_ITEMS)); } else this.emit({ k: 'txt', id: p.id, s: 'クールダウン中', c: '#9ca3af' }); }
+        if (r.length >= 8) { r.length = 0; if (p.rhythmCD <= 0) { p.rhythmCD = 15; if (p.item) this.dropItem(p); this.giveItem(p, pick(this.itemPool.length ? this.itemPool : GD.SPAWN_ITEMS)); } else this.emit({ k: 'txt', id: p.id, s: 'クールダウン中', c: '#9ca3af' }); }
       }
 
       // バイク・チェア体当たり
@@ -1096,7 +1133,7 @@ window.Sim = (function () {
       const r2 = (v) => Math.round(v * 100) / 100;
       return {
         t: r2(this.t), g: this.gimmick, ph: this.phase, wd: r2(this.windDir), bo: this.blackout > 0 ? 1 : 0, lives: this.lives,
-        mp: this.map, tmode: this.teamMode ? 1 : 0,
+        mp: this.map, tmode: this.teamMode ? 1 : 0, sh: this.shopList,
         pl: this.plats.map((q) => [Math.round(q.x * 100) / 100, Math.round(q.z * 100) / 100, q.w, q.d, q.y]),
         tl: this.tiles.map((t) => (t.none ? -200 : t.gone ? -99 : t.on ? r2(t.top) : -50) + (t.shake > 0 ? 1000 : 0) + (t.blink > 2 || (t.warn && !t.gone) ? 2000 : 0)),
         bx: this.boxes.map((b) => [r2(b.x), r2(b.z), b.w, b.d, r2(b.top), r2(b.bot)]),

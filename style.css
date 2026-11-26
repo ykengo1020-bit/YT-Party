@@ -223,3 +223,48 @@ body.kyouki #c { animation: wob 1.6s infinite; }
 .tbadge { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); color: #fff; font-weight: 900; font-size: 12px; border: 2px solid var(--ink); border-radius: 8px; padding: 0 8px; white-space: nowrap; text-shadow: 1px 1px 0 #000; }
 .board .thead { color: #fff; font-weight: 900; font-size: 13px; border-radius: 8px; padding: 1px 8px; margin-top: 4px; text-shadow: 1px 1px 0 #000; border: 2px solid var(--ink); }
 .board .thead span { float: right; font-size: 11px; }
+
+/* 出るアイテムの切り替え */
+.itoggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.itog { font-family: var(--font); font-weight: 900; font-size: 13px; padding: 4px 10px; border: 3px solid var(--ink); border-radius: 10px; background: #e9e4dc; color: #8a8494; text-decoration: line-through; }
+.itog.on { background: #fff; color: var(--ink); text-decoration: none; box-shadow: 2px 2px 0 var(--ink); }
+.itog:disabled { cursor: default; }
+.linkb { font-family: var(--font); font-weight: 900; font-size: 12px; border: 0; background: none; color: var(--vio); text-decoration: underline; margin-left: 8px; padding: 0; }
+
+/* ---------- 操作説明 ---------- */
+.helppanel { width: min(1080px, 96vw); }
+.helpgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.hcard { background: #fff; border: 4px solid var(--ink); border-radius: 18px; overflow: hidden; box-shadow: 4px 4px 0 var(--ink); }
+.hcard h4 { margin: 0; padding: 6px 14px; font-size: 17px; font-weight: 900; color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,.5); border-bottom: 4px solid var(--ink); }
+.hcard .hb { padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
+.hrow { display: grid; grid-template-columns: 108px 1fr; align-items: center; gap: 10px; }
+.hrow .ks { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; justify-content: flex-start; }
+.hrow .ks i { font-style: normal; font-weight: 900; font-size: 12px; color: #8a8494; }
+.cap { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 7px; background: linear-gradient(#fffdf7, #ece6da); border: 2.5px solid var(--ink); border-bottom-width: 5px; border-radius: 8px; font-weight: 900; font-size: 13px; line-height: 1; white-space: nowrap; }
+.cap.wide { min-width: 58px; }
+.cap.m { background: linear-gradient(#ffe1ec, #ffc2d8); }
+.hrow .t { font-weight: 900; font-size: 14px; line-height: 1.25; }
+.hrow .t small { display: block; font-weight: 700; font-size: 12px; color: #6b6378; margin-top: 1px; }
+.wasd { display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: 30px 30px; gap: 3px; }
+.wasd .cap { min-width: 30px; padding: 0; }
+.wasd .cap:first-child { grid-column: 2; }
+.mouse { display: flex; gap: 12px; align-items: center; }
+.mouse svg { flex: 0 0 auto; }
+.helptip { margin-top: 12px; font-weight: 800; font-size: 13px; color: #4b4458; background: #fff7d6; border: 3px dashed #e8c96a; border-radius: 12px; padding: 8px 12px; }
+@media (max-width: 900px) { .helpgrid { grid-template-columns: 1fr 1fr; } }
+.wasd .cap:nth-child(1) { grid-column: 2; grid-row: 1; }
+.wasd .cap:nth-child(2) { grid-column: 1; grid-row: 2; }
+.wasd .cap:nth-child(3) { grid-column: 2; grid-row: 2; }
+.wasd .cap:nth-child(4) { grid-column: 3; grid-row: 2; }
+.helppanel { max-height: 96vh; overflow: auto; padding: 18px 22px; }
+.helpgrid { gap: 12px; }
+.hcard h4 { padding: 4px 12px; font-size: 15px; }
+.hcard .hb { gap: 6px; padding: 7px 10px 8px; }
+.hrow { grid-template-columns: 104px 1fr; gap: 8px; }
+.hrow .t { font-size: 13px; }
+.hrow .t small { font-size: 11px; }
+.cap { height: 26px; min-width: 26px; font-size: 12px; border-bottom-width: 4px; }
+.wasd { grid-template-columns: repeat(3, 26px); grid-template-rows: 26px 26px; }
+.wasd .cap { min-width: 26px; }
+.mouse svg { width: 46px; height: 66px; }
+.helptip { margin-top: 10px; padding: 6px 10px; font-size: 12px; }

@@ -9,7 +9,7 @@
 
   const S = {
     mode: 'title', role: 'solo', name: '', char: 'kenken',
-    lobby: { members: [], lives: 2, cpu: 3, lvl: 2, mode: 0, teams: 2, ff: 0, cpuTeams: [] },
+    lobby: { members: [], lives: 2, cpu: 3, lvl: 2, mode: 0, teams: 2, ff: 0, cpuTeams: [], items: GD.SPAWN_ITEMS.slice(), itemRate: 2 },
     game: null, myPid: 0, peerMap: new Map(),
     snaps: [], fxQ: [], netAcc: 0, inAcc: 0, acc: 0,
     lastSnap: null, ended: false, paused: false, shopOpen: false,
@@ -106,13 +106,13 @@
   // ---------- ルール説明（動画つき）----------
   const K = (a) => '<kbd>' + Settings.key(a) + '</kbd>';
   const RULES = [
-    { v: 'rule_punch', t: '殴ってヘロヘロ値を上げる', x: () => `${K('punch')}でパンチ。当てるたびに相手の<b>ヘロヘロ値（%）</b>が上がります。<br>${K('punch')}を長押しすると<b>溜めパンチ</b>。手が光ったら離すと大きく吹っ飛ばせます。空中で押すとドロップキック。<br>ヘロヘロ値は時間では減らず、<b>100%を超えて999%まで</b>溜まります（落ちると0%に戻る）。` },
+    { v: 'rule_punch', t: '殴ってヘロヘロ値を上げる', x: () => `${K('punch')}でパンチ。当てるたびに相手の<b>ヘロヘロ値（%）</b>が上がります。<b>3連続で当てるとコンボ</b>になり、3発目で大きく吹っ飛ばせます。<br>${K('punch')}を長押しすると<b>溜めパンチ</b>。手が光ったら離すと大きく吹っ飛ばせます。空中で押すとドロップキック。<br>ヘロヘロ値は時間では減らず、<b>100%を超えて999%まで</b>溜まります（落ちると0%に戻る）。` },
     { v: 'rule_smash', t: 'ヘロヘロ値が高いほど遠くへ吹っ飛ぶ', x: () => `ヘロヘロ値が高い相手ほど、同じ攻撃でも遠くまで飛びます。100%前後の溜めパンチなら中央からでも場外まで飛ぶことも。<br><b>場外に落ちるとライフ-1</b>。ライフ（1〜3、ロビーで選ぶ）が0になると脱落、<b>最後の一人が優勝</b>です。<br>落ちてもライフが残っていれば3秒後に空から復帰します。` },
     { v: 'rule_grab', t: '掴んで、持ち上げて、投げる', x: () => `${K('grab')}を長押しすると目の前の相手を掴みます。<b>0.5秒以上掴むと持ち上げ</b>、ボタンを離すと向いている方向へ投げます。<br>掴んだまま場外のほうへ歩いて行って投げるのが一番の勝ち筋。<br>掴まれた側は ${K('punch')} や ${K('jump')} を連打すると振りほどけます。` },
     { v: 'rule_stun', t: '100%・150%・200%…で気絶', x: () => `ヘロヘロ値が<b>100%・150%・200%…と50%刻みのラインを超えるたびに約1.3秒気絶</b>します（頭の上に星）。<br>気絶した相手は掴んで運び放題。ヘロヘロ値が高いほど、掴まれたときに振りほどくのも大変になります。` },
     { v: 'rule_ledge', t: '二段ジャンプと崖つかまりで復帰', x: () => `空中でもう1回 ${K('jump')} が使えます（<b>二段ジャンプ</b>。宙返りしながら高く跳ぶ）。地面・浮き床・崖につかまると回復します。<br>ステージの端に手が届くと<b>自動で崖につかまり</b>ます。${K('jump')}で登る、${K('dash')}で手を離す。<br>崖につかまっている相手は殴ると手を離します。` },
     { v: 'rule_guard', t: 'ガードと頭突き', x: () => `${K('guard')}を長押しすると<b>正面からのパンチをほぼ防げます</b>（青い火花）。ただし掴みは防げません。<br>${K('head')}は頭突き。届く距離は短いけれどヘロヘロ値が大きく上がります。` },
-    { v: 'rule_item', t: 'アイテム', x: () => `ステージにはアイテムが湧きます。手ぶらで触れると拾います。<br>武器（AR／SR／SG／モニター）は${K('punch')}で使う、ほかは${K('use')}で使う、${K('drop')}で投げる。<br><table><tr><td>AR</td><td>連射で押し出す</td></tr><tr><td>SR</td><td>長押しで溜めて撃つ。大ふっとび</td></tr><tr><td>SG</td><td>近距離で特大ふっとび</td></tr><tr><td>モニター</td><td>振り回してモニターパンチ</td></tr><tr><td>LANケーブル</td><td>投げて相手を5秒縛る</td></tr><tr><td>ゲーミングチェア</td><td>乗って突進</td></tr><tr><td>エナドリ／五苓散／デトックス</td><td>スピードアップ／状態異常回復／状態異常無効</td></tr></table>` },
+    { v: 'rule_item', t: 'アイテム', x: () => `ステージにはアイテムが湧きます。手ぶらで触れると拾います。<br><b>どのアイテムも ${K('use')} で使う</b>（武器なら撃つ・振る）、${K('drop')}で投げる。武器を持っていても ${K('punch')} は素手のパンチです。<br><table><tr><td>AR</td><td>長押しで連射して押し出す</td></tr><tr><td>SR</td><td>長押しで溜めて、離すと撃つ。大ふっとび</td></tr><tr><td>SG</td><td>近距離で特大ふっとび</td></tr><tr><td>モニター</td><td>振り回してモニターパンチ</td></tr><tr><td>LANケーブル</td><td>投げて相手を5秒縛る</td></tr><tr><td>ゲーミングチェア</td><td>乗って突進</td></tr><tr><td>エナドリ／五苓散／デトックス</td><td>スピードアップ／状態異常回復／状態異常無効</td></tr></table>` },
     { v: null, t: '浮き床と地形', x: () => `ステージには高低差と<b>浮き床</b>があります。浮き床は<b>下からジャンプですり抜けて上に乗れます</b>。<br>浮き床から降りたいときは ${K('guard')} を押しながら ${K('jump')}。<br>動く浮き床は乗っている人を一緒に運びます。段差は普通のジャンプで登れる高さです。` },
     { v: null, t: 'チーム戦', x: () => `ロビーでホストが<b>「チーム戦」</b>を選ぶと、2〜4チームに分かれて戦えます。<br>自分のカードをクリックするとチームが変わります（ホストはCPUも含めて全員を変えられる）。<br>「味方への攻撃：当たらない」なら、味方にはパンチ・掴み・スキルが当たりません。「当たる」にすると巻き込み注意。<br><b>相手チームを全員脱落させたチームの勝ち</b>。足元の輪と名前の色が自分のチームの色です。` },
     { v: null, t: 'TP・スキル・交換券', x: () => `<b>TPは5秒ごとに1ずつ</b>自動で貯まります（最大30）。相手を落とすと+2、投げると+1。<br>${K('s1')}〜${K('s4')}でキャラごとのスキル（TPを消費）、${K('v')}でキャラ固有アクション。<br>スキルの中身はキャラ選択画面で<b>動画つきで確認</b>できます。<br>相手を3回落とすと<b>アイテム交換券</b>。${K('shop')}で好きなアイテムと交換できます。` },
@@ -147,26 +147,47 @@
 
   // 操作説明などのキー表示を設定に合わせる
   function updateKeyTexts() {
-    const K = (a) => '<kbd>' + Settings.key(a) + '</kbd>';
+    const raw = (a) => Settings.get().keys[a];
+    const cap = (a) => { const c = raw(a), l = Settings.key(a); return `<span class="cap ${c && c.startsWith('Mouse') ? 'm' : ''} ${l.length > 3 ? 'wide' : ''}">${esc(l)}</span>`; };
+    const row = (keys, t, sub) => `<div class="hrow"><div class="ks">${keys}</div><div class="t">${t}${sub ? `<small>${sub}</small>` : ''}</div></div>`;
+    const card = (title, color, body) => `<div class="hcard"><h4 style="background:${color}">${title}</h4><div class="hb">${body}</div></div>`;
+    const plus = '<i>＋</i>';
+    // マウスの図：割り当てられているボタンに色をつける
+    const mb = (n) => Object.keys(Settings.get().keys).filter((a) => raw(a) === 'Mouse' + n).map((a) => (Settings.ACTIONS.find((x) => x[0] === a) || [0, a])[1].replace(/（.*?）/g, '')).join('／') || '—';
+    const mouseSvg = `<svg width="62" height="88" viewBox="0 0 62 88"><rect x="3" y="3" width="56" height="82" rx="28" fill="#fff" stroke="#15121f" stroke-width="4"/><path d="M31 3 V38 M3 38 H59" stroke="#15121f" stroke-width="3"/><path d="M5 36 V30 A26 26 0 0 1 29 5 V36 Z" fill="#ff4d8d"/><path d="M33 5 A26 26 0 0 1 57 30 V36 H33 Z" fill="#3be2ff"/><rect x="27" y="12" width="8" height="16" rx="4" fill="#ffd23b" stroke="#15121f" stroke-width="2.5"/></svg>`;
     $('helpKeys').innerHTML = [
-      [K('fwd') + K('left') + K('back') + K('right'), '移動（カメラの向き基準）'],
-      ['<kbd>マウス</kbd>', 'カメラを回す（画面クリックで固定、Escで解除）　' + K('camL') + K('camR') + 'でも回せる'],
-      [K('jump'), 'ジャンプ（空中でもう1回＝二段ジャンプ）／崖から登る'],
-      [K('guard') + '＋' + K('jump'), '浮き床から下に降りる'],
-      [K('dash'), 'ダッシュ（崖では手を離す）'],
-      [K('punch'), 'パンチ（左右交互）。長押しで溜めパンチ。空中で押すとドロップキック'],
-      [K('grab') + ' 長押し', '掴む。0.5秒以上掴むと持ち上げ、離すと投げる'],
-      [K('head'), '頭突き（ヘロヘロ値が大きく上がる）'],
-      [K('guard') + ' 長押し', 'ガード（正面のパンチを防ぐ、掴みは防げない）'],
-      [K('s1') + K('s2') + K('s3') + K('s4'), 'スキル（TPを消費）'],
-      [K('v'), 'キャラ固有アクション（バイク・大鎌・武器呼び出し）'],
-      ['<kbd>ホイール</kbd>', 'ロール付与の状態異常／呼び出す武器を選ぶ'],
-      [K('g'), 'ヒロ専用：0.5秒間隔で8回刻むとアイテム'],
-      [K('use'), 'アイテムを使う（SSTは長押し＋TP20で改造）'],
-      [K('drop'), 'アイテムを投げる'],
-      [K('shop'), 'アイテム交換券を使う（交換所）'],
-      ['<kbd>掴まれたら</kbd>', K('punch') + 'や' + K('jump') + 'を連打して振りほどく'],
-    ].map(([k, t]) => k + '<span>' + t + '</span>').join('');
+      card('移動', '#3b82f6',
+        `<div class="hrow"><div class="wasd">${cap('fwd')}${cap('left')}${cap('back')}${cap('right')}</div><div class="t">移動<small>カメラの向きが「前」</small></div></div>` +
+        row(cap('jump'), 'ジャンプ', '空中でもう1回＝二段ジャンプ。崖では登る') +
+        row(cap('dash'), 'ダッシュ', '崖につかまっているときは手を離す') +
+        row(cap('guard') + plus + cap('jump'), '浮き床から降りる')),
+      card('攻撃', '#ef4444',
+        row(cap('punch'), 'パンチ', '左右交互。3連続で当てるとコンボで大きく吹っ飛ぶ') +
+        row(cap('punch') + '<i>長押し</i>', '溜めパンチ', '手が光ったら離す') +
+        row(cap('head'), '頭突き', '届く距離は短いがヘロヘロ値が大きく上がる') +
+        row(cap('guard') + '<i>長押し</i>', 'ガード', '正面のパンチを防ぐ（掴みは防げない）')),
+      card('掴み・投げ', '#f97316',
+        row(cap('grab') + '<i>長押し</i>', '掴む', '0.5秒以上で持ち上げる') +
+        row('<i>離す</i>', '投げる', '向いている方向へ。場外の近くで投げると強い') +
+        row(cap('punch') + '<i>連打</i>', '掴まれたら振りほどく', 'ジャンプの連打でもOK。ヘロヘロ値が高いほど大変')),
+      card('スキル', '#7c5cff',
+        row(cap('s1') + cap('s2') + cap('s3') + cap('s4'), 'スキル', 'TPを使う。TPは5秒ごとに1ずつ貯まる') +
+        row(cap('v'), 'キャラ固有アクション', 'ayuのバイク・にもの大鎌・タカラソドの武器呼び出し') +
+        row('<span class="cap wide">ホイール</span>', '選ぶ', 'ロール付与の状態異常・呼び出す武器') +
+        row(cap('g') + '<i>×8</i>', 'リズム（ヒロ専用）', '0.5秒間隔で刻むとアイテム')),
+      card('アイテム', '#16a34a',
+        row('<i>触れる</i>', '拾う', '手ぶらのときに近づくだけ') +
+        row(cap('use'), '使う', 'どのアイテムもこのボタン。AR・SRは長押し、SRは離して撃つ') +
+        row(cap('use') + '<i>長押し</i>', 'SSTを改造', 'TP20を使って確定で撃退できる改造SSTに') +
+        row(cap('drop'), '投げる', '投げたアイテムは当たると少しダメージ') +
+        row(cap('shop'), '交換所', '相手を3回落とすと交換券がもらえる')),
+      card('カメラ・その他', '#64748b',
+        `<div class="hrow"><div class="ks mouse">${mouseSvg}</div><div class="t">マウス<small><b style="color:#e11d74">左</b> ${mb(0)}<br><b style="color:#0891b2">右</b> ${mb(2)}<br><b style="color:#b45309">ホイール</b> 選ぶ</small></div></div>` +
+        row(cap('camL') + cap('camR'), 'カメラを回す', 'マウスでも回せる（画面をクリックで固定）') +
+        row(cap('help') + cap('mute'), '操作説明 ／ 音オンオフ') +
+        row('<span class="cap wide">Esc</span>', 'メニュー', '設定・ルール説明・タイトルへ')),
+    ].join('');
+    $('helpTip').innerHTML = 'キーやマウス感度は「設定」から好きなように変えられます。この画面の表示も変えたキーに合わせて変わります。';
     $('hint').textContent = `[${Settings.key('help')}] 操作説明　[${Settings.key('mute')}] 音　[Esc] 設定・メニュー`;
   }
   document.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => b.closest('.ov').classList.add('hidden')));
@@ -183,7 +204,7 @@
   function pushLobby() { if (S.role === 'host') Net.broadcast({ t: 'lobby', L: lobbyPublic() }); }
   function lobbyPublic() {
     const L = S.lobby; fixTeams();
-    return { members: L.members.map((m) => ({ key: m.key, name: m.name, char: m.char, team: m.team | 0 })), lives: L.lives, cpu: L.cpu, lvl: L.lvl, mode: L.mode, teams: L.teams, ff: L.ff, cpuTeams: L.cpuTeams, playing: S.mode === 'game' && !S.ended };
+    return { members: L.members.map((m) => ({ key: m.key, name: m.name, char: m.char, team: m.team | 0 })), lives: L.lives, cpu: L.cpu, lvl: L.lvl, mode: L.mode, teams: L.teams, ff: L.ff, cpuTeams: L.cpuTeams, items: L.items, itemRate: L.itemRate, playing: S.mode === 'game' && !S.ended };
   }
   // チーム：人数が少ないチームへ自動で入れる。範囲外のチームは直す
   function cpuCount() { const L = S.lobby; return Math.max(0, Math.min(L.cpu, 8 - L.members.length)); }
@@ -238,10 +259,19 @@
     $('lbNote').textContent = S.role === 'client'
       ? (L.playing ? '今は試合中です。終わったら次の試合から一緒に遊べます' : `ホストのスタート待ち… ${modeTxt}・ライフ${L.lives}${team ? '・自分のカードをクリックでチーム変更' : ''}`)
       : S.role === 'host' ? `参加者 ${L.members.length}人 ／ 最大8人（CPU含む）　${modeTxt}${team ? '・カードをクリックでチーム変更' : ''}` : (team ? 'カードをクリックでチーム変更' : '');
-    ['segLives', 'segCpu', 'segLvl', 'segMode', 'segTeams', 'segFF'].forEach((id, i) => { const v = [L.lives, L.cpu, L.lvl, L.mode, L.teams, L.ff][i]; $(id).querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.v === v)); });
+    ['segLives', 'segCpu', 'segLvl', 'segMode', 'segTeams', 'segFF', 'segRate'].forEach((id, i) => { const v = [L.lives, L.cpu, L.lvl, L.mode, L.teams, L.ff, L.itemRate][i]; $(id).querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.v === v)); });
+    // 出るアイテム
+    $('itemToggles').innerHTML = GD.SPAWN_ITEMS.map((k) => `<button class="itog ${L.items.includes(k) ? 'on' : ''}" data-k="${k}" ${isHost ? '' : 'disabled'} title="${ITEMS[k].desc}">${ITEMS[k].name}</button>`).join('');
+    $('itemToggles').querySelectorAll('.itog').forEach((b) => (b.onclick = () => {
+      const k = b.dataset.k; L.items = L.items.includes(k) ? L.items.filter((x) => x !== k) : L.items.concat(k);
+      Sfx.play('click'); renderLobby(); pushLobby();
+    }));
+    $('itemNone').onclick = () => { L.items = []; renderLobby(); pushLobby(); };
+    $('itemAll').onclick = () => { L.items = GD.SPAWN_ITEMS.slice(); renderLobby(); pushLobby(); };
+    $('itemSummary').textContent = L.itemRate === 0 || !L.items.length ? 'アイテムなし' : `${L.items.length}種類・出現量${['なし', '少なめ', '普通', '多め'][L.itemRate]}`;
   }
   function seg(id, key, after) { $(id).querySelectorAll('button').forEach((b) => (b.onclick = () => { S.lobby[key] = +b.dataset.v; if (after) after(); Sfx.play('click'); renderLobby(); pushLobby(); })); }
-  seg('segMode', 'mode', rebalance); seg('segTeams', 'teams', rebalance); seg('segFF', 'ff');
+  seg('segRate', 'itemRate'); seg('segMode', 'mode', rebalance); seg('segTeams', 'teams', rebalance); seg('segFF', 'ff');
   seg('segLives', 'lives'); seg('segCpu', 'cpu'); seg('segLvl', 'lvl');
   $('bChar').onclick = () => openSelect((c) => { if (S.role === 'client') { Net.sendHost({ t: 'char', char: c }); screen('lobby'); renderLobby(); } else enterLobby(); });
   $('bCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(S.code); toast('コピーしました：' + S.code); };
@@ -280,7 +310,7 @@
   }
   function sanitize(i) {
     const o = { mx: +i.mx || 0, mz: +i.mz || 0, ay: +i.ay || 0, ap: +i.ap || 0, b: {}, c: {}, sel: (i.sel | 0), useHold: !!i.useHold, buy: null };
-    for (const k of ['jump', 'punch', 'grab', 'dash', 'guard', 'head']) o.b[k] = !!(i.b && i.b[k]);
+    for (const k of ['jump', 'punch', 'grab', 'dash', 'guard', 'head', 'use']) o.b[k] = !!(i.b && i.b[k]);
     for (const k of ['jump', 'punch', 'head', 'use', 'drop', 's1', 's2', 's3', 's4', 'v', 'g', 'grabc']) o.c[k] = (i.c && i.c[k]) | 0;
     if (i.buy && typeof i.buy.item === 'string') o.buy = { seq: i.buy.seq | 0, item: i.buy.item };
     return o;
@@ -390,7 +420,7 @@
   function startGame(map) {
     const L = S.lobby;
     fixTeams();
-    const g = new Sim.Game({ lives: L.lives, map, teamMode: !!L.mode, ff: !!L.ff });
+    const g = new Sim.Game({ lives: L.lives, map, teamMode: !!L.mode, ff: !!L.ff, items: L.items, itemRate: L.itemRate });
     S.peerMap.clear();
     for (const m of L.members) {
       const p = g.addPlayer({ name: m.name, char: m.char, team: m.team | 0 });
@@ -456,6 +486,7 @@
   $('bResume').onclick = () => { show('pause', false); S.paused = false; requestLock(); };
   $('bHelp2').onclick = () => show('help');
   $('bSet3').onclick = () => Settings.open();
+  $('helpSet').onclick = () => { $('help').classList.add('hidden'); Settings.open(); };
   $('bQuit').onclick = () => { if (S.role === 'host' && !confirm('部屋を閉じますか？（みんなの接続が切れます）')) return; toTitle(); };
   document.addEventListener('mousemove', (e) => {
     if (document.pointerLockElement !== canvas) return;
@@ -467,7 +498,7 @@
     cam.pitch = Math.max(-0.15, Math.min(1.25, cam.pitch + e.movementY * 0.0022 * st.sens * (st.invertY ? -1 : 1)));
   });
   const bump = (k) => { input.c[k] = (input.c[k] || 0) + 1; };
-  const HOLD = { jump: 'jump', dash: 'dash', punch: 'punch', grab: 'grab', guard: 'guard' };
+  const HOLD = { jump: 'jump', dash: 'dash', punch: 'punch', grab: 'grab', guard: 'guard', use: 'use' };
   // コード（キー or マウスボタン）が押された／離された
   function press(code) {
     if (Settings.isCapturing()) return;
@@ -475,7 +506,8 @@
     if (S.shopOpen) {
       if (Settings.get().keys.shop === code || code === 'Escape') closeShop();
       const n = code.startsWith('Digit') ? (code === 'Digit0' ? 10 : +code.slice(5)) : 0;
-      if (n >= 1 && n <= SHOP_ITEMS.length) buy(SHOP_ITEMS[n - 1]);
+      const SL = (S.lastSnap && S.lastSnap.sh) || SHOP_ITEMS;
+      if (n >= 1 && n <= SL.length) buy(SL[n - 1]);
       return;
     }
     if (keys[code]) return; keys[code] = true;
@@ -534,7 +566,8 @@
     S.shopOpen = true; show('shop');
     if (document.pointerLockElement) document.exitPointerLock();
     $('shopTk').textContent = '交換券 ×' + me.tk;
-    $('shopGrid').innerHTML = SHOP_ITEMS.map((k, i) => `<div class="it" data-k="${k}"><span>${(i + 1) % 10}</span>${ITEMS[k].name}<div class="tiny">${ITEMS[k].desc}</div></div>`).join('');
+    const SL = S.lastSnap.sh || SHOP_ITEMS;
+    $('shopGrid').innerHTML = SL.map((k, i) => `<div class="it" data-k="${k}"><span>${(i + 1) % 10}</span>${ITEMS[k].name}<div class="tiny">${ITEMS[k].desc}</div></div>`).join('');
     $('shopGrid').querySelectorAll('.it').forEach((d) => (d.onclick = () => buy(d.dataset.k)));
   }
   function closeShop() { S.shopOpen = false; show('shop', false); requestLock(); }

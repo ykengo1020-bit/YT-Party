@@ -22,16 +22,16 @@ window.GD = (function () {
   const RANDOM_POOL = ['majigire', 'kyouki', 'lag', 'nanchou', 'g5', 'gamechu', 'hagotae', 'hiroyuki', 'takawarai', 'naeochi', 'keyboard'];
 
   const ITEMS = {
-    ar:      { name: 'AR', color: 0x4b5563, weapon: true, ammo: 14, desc: '連射で押し出す' },
-    sr:      { name: 'SR', color: 0x1f2937, weapon: true, ammo: 2, desc: '溜め撃ちで大ふっとび' },
-    sg:      { name: 'SG', color: 0x7c4a1e, weapon: true, ammo: 4, desc: '近距離で特大ふっとび' },
-    monitor: { name: 'モニター', color: 0x111827, weapon: true, ammo: 5, desc: '振り回してモニターパンチ' },
+    ar:      { name: 'AR', color: 0x4b5563, weapon: true, ammo: 14, desc: '[使う]長押しで連射' },
+    sr:      { name: 'SR', color: 0x1f2937, weapon: true, ammo: 2, desc: '[使う]長押しで溜め、離して撃つ' },
+    sg:      { name: 'SG', color: 0x7c4a1e, weapon: true, ammo: 4, desc: '[使う]で近距離に特大ふっとび' },
+    monitor: { name: 'モニター', color: 0x111827, weapon: true, ammo: 5, desc: '[使う]で振り回してモニターパンチ' },
     detox:   { name: 'デジタルデトックス', color: 0x86efac, desc: '状態異常を解除＋10秒無効' },
     lan:     { name: 'LANケーブル', color: 0x3b82f6, desc: '投げて相手を縛る' },
     chair:   { name: 'ゲーミングチェア', color: 0xef4444, desc: '乗って突進' },
     energy:  { name: 'エナドリ', color: 0xa3e635, desc: '15秒スピードアップ' },
     goreisan:{ name: '五苓散', color: 0xfef3c7, desc: '状態異常を回復' },
-    sst:     { name: 'SST', color: 0x22d3ee, cookie: true, desc: 'Marsに使うと30%で撃退（TP20で改造）' },
+    sst:     { name: 'SST', color: 0x22d3ee, cookie: true, desc: 'Marsに使うと30%で撃退（[使う]長押し＋TP20で改造）' },
     sst2:    { name: '改造SST', color: 0xf43f5e, cookie: true, desc: 'Marsを確定で撃退' },
   };
   const SPAWN_ITEMS = ['ar', 'sr', 'sg', 'monitor', 'detox', 'lan', 'chair', 'energy', 'goreisan'];
@@ -42,22 +42,22 @@ window.GD = (function () {
     kenken: {
       name: 'kenken', color: 0x3b82f6, sub: 0x1e3a8a, acc: 'glasses',
       desc: '多分リーダー？本当にやばい時は正気に戻る。',
-      stats: [3, 3, 3], res: 'normal', weak: [],
-      passive: { name: 'Java&Pythonプログラマー', desc: '30秒ごとにランダムなステータスが15秒間1段階上がる' },
+      stats: [4, 4, 4], res: 'normal', weak: [],
+      passive: { name: 'Java&Pythonプログラマー', desc: '20秒ごとにランダムなステータスが15秒間1段階上がる' },
       skills: [
         { id: 'modifier', name: 'モディファイア', tp: 5, desc: '他の全員にランダムな状態異常' },
         { id: 'surume', name: 'イーティングスルメイカ', tp: 6, desc: '自分に歯ごたえ（掴み保持2倍）' },
         { id: 'kirinuki', name: '切り抜き視聴', tp: 10, desc: '自分にヒロユキ構文（自動反論）' },
-        { id: 'kichige', name: 'キチゲ解放', tp: 8, desc: '全員を衝撃波で吹き飛ばしTP-2、自分は30秒マジギレ' },
+        { id: 'kichige', name: 'キチゲ解放', tp: 10, desc: '全員を衝撃波で吹き飛ばしTP-2、自分は30秒マジギレ' },
       ],
     },
     ayu: {
       name: 'ayu', color: 0xf97316, sub: 0x7c2d12, acc: 'helmet',
       desc: 'ボケ担当の生粋のルーニーでトロール。鯖主で管理者権限持ち。',
       stats: [2, 3, 2], res: 'high', weak: [],
-      passive: { name: '高校生だぞおめぇ！', desc: '[V] バイクを召喚して10秒乗る（CT60秒）', special: 'bike', cd: 60 },
+      passive: { name: '高校生だぞおめぇ！', desc: '[V] バイクを召喚して6秒乗る（CT70秒）', special: 'bike', cd: 70 },
       skills: [
-        { id: 'subaka', name: 'サブ垢召喚', tp: 6, desc: 'キャシー塚本が100秒間身代わり（3回まで）' },
+        { id: 'subaka', name: 'サブ垢召喚', tp: 9, desc: 'キャシー塚本が40秒間、攻撃・掴み・状態異常を2回まで肩代わり' },
         { id: 'soundboard', name: 'サウンドボード爆撃', tp: 8, desc: '他の全員に70%でラグ＋難聴（にもは確定）' },
         { id: 'role', name: 'ロール付与', tp: 8, desc: '狙った相手にホイールで選んだ状態異常', aim: true },
         { id: 'kirinuki', name: '切り抜き視聴', tp: 10, desc: '自分にヒロユキ構文' },
@@ -66,7 +66,7 @@ window.GD = (function () {
     hiro: {
       name: 'ヒロ', color: 0x10b981, sub: 0x064e3b, acc: 'headphones',
       desc: '無口で落ち着いている。一番まともだが笑い方が一番狂っている。',
-      stats: [3, 3, 3], res: 'shigh', weak: ['takawarai'],
+      stats: [4, 3, 4], res: 'shigh', weak: ['takawarai'],
       passive: { name: '音ゲーマー', desc: '[G] 0.5秒間隔で8回刻むとアイテム入手。ゲーム中毒無効', special: 'rhythm' },
       skills: [
         { id: 'chudoku', name: '中毒者勧誘', tp: 8, desc: '全員に80%でゲーム中毒' },
@@ -77,12 +77,12 @@ window.GD = (function () {
     cotton: {
       name: 'コットン', color: 0xf5f5f4, sub: 0x9ca3af, acc: 'bandana',
       desc: '比較的まともで理性もあるが情緒が不安定。胃腸が弱い。',
-      stats: [4, 4, 4], res: 'low', weak: ['majigire', 'gamechu', 'g5'],
+      stats: [5, 4, 5], res: 'slow', weak: ['g5'],
       passive: { name: 'C#プログラマー', desc: '20秒ごとにランダムなステータス+1（場外でリセット）' },
       skills: [
         { id: 'modifier', name: 'モディファイア', tp: 5, desc: '他の全員にランダムな状態異常' },
         { id: 'goreisan', name: '五苓散投与', tp: 7, desc: '自分の状態異常を回復' },
-        { id: 'mousou', name: 'スーパー妄想', tp: 4, desc: '50%で60秒TP2倍／50%でTP-3' },
+        { id: 'mousou', name: 'スーパー妄想', tp: 4, desc: '65%で60秒TP2倍＆パワー+1／35%でTP-3' },
         { id: 'rinri', name: '倫理EXAM', tp: 6, desc: '自分に不定の狂気（掴み・投げ2倍）' },
       ],
     },
@@ -101,11 +101,11 @@ window.GD = (function () {
     yururu: {
       name: 'ゆるる', color: 0xeab308, sub: 0x713f12, acc: 'hardhat',
       desc: 'フットワークが軽いが、同時にかなりの凝り性。',
-      stats: [4, 4, 3], res: 'shigh', weak: [],
-      passive: { name: 'キチguy', desc: 'マジギレ・不定の狂気のデメリット無効。30秒ごとにランダムなデバフ' },
+      stats: [5, 4, 4], res: 'shigh', weak: [],
+      passive: { name: 'キチguy', desc: 'マジギレ・不定の狂気のデメリット無効。45秒ごとに6秒のランダムなデバフ' },
       skills: [
-        { id: 'build', name: '建築タイム', tp: 8, desc: '周りに壁と足場を建築。2/3でライフ+1&TP+5、1/3で爆破される' },
-        { id: 'kichige', name: 'キチゲ解放', tp: 8, desc: '全員を衝撃波で吹き飛ばす' },
+        { id: 'build', name: '建築タイム', tp: 10, desc: '周りに壁と足場を25秒建築。3/5でヘロヘロ-25%&TP+3、2/5で爆破されて状態異常' },
+        { id: 'kichige', name: 'キチゲ解放', tp: 10, desc: '全員を衝撃波で吹き飛ばす' },
         { id: 'rinri', name: '倫理EXAM', tp: 6, desc: '自分に不定の狂気' },
         { id: 'kirinuki', name: '切り抜き視聴', tp: 10, desc: '自分にヒロユキ構文' },
       ],
@@ -113,12 +113,12 @@ window.GD = (function () {
     nimo: {
       name: 'にも', color: 0x111827, sub: 0xdc2626, acc: 'hood',
       desc: '口が悪く煽りまくる。マウスのフリック速度が異常。実はかなりの努力家。',
-      stats: [4, 5, 3], res: 'low', weak: ['lag', 'nanchou', 'majigire'],
-      passive: { name: 'ライバルの大鎌', desc: '[V] 向いている方向へ一気に移動（空中復帰可、CT45秒）', special: 'scythe', cd: 45 },
+      stats: [4, 4, 2], res: 'low', weak: ['lag', 'nanchou', 'majigire'],
+      passive: { name: 'ライバルの大鎌', desc: '[V] 向いている方向へ一気に移動（空中復帰可、CT80秒）', special: 'scythe', cd: 80 },
       skills: [
-        { id: 'edit', name: '高速動画編集', tp: 5, desc: '2/3で全員ヘロヘロ+40%、1/3で自分+20%' },
+        { id: 'edit', name: '高速動画編集', tp: 7, desc: '2/3で全員ヘロヘロ+25%、1/3で自分+20%' },
         { id: 'snipe', name: '超々精密射撃', tp: 8, desc: '狙った相手を大きくふっとばしマジギレ', aim: true },
-        { id: 'kichige', name: 'キチゲ解放', tp: 8, desc: '全員を衝撃波で吹き飛ばす' },
+        { id: 'kichige', name: 'キチゲ解放', tp: 10, desc: '全員を衝撃波で吹き飛ばす' },
         { id: 'kirinuki', name: '切り抜き視聴', tp: 10, desc: '自分にヒロユキ構文' },
       ],
     },
@@ -126,12 +126,12 @@ window.GD = (function () {
       name: 'うぃきっと', color: 0xf9a8d4, sub: 0xbe185d, acc: 'ribbon',
       desc: '声は幼いがayuと同い年。よく声が可愛いと言われる。',
       stats: [2, 2, 2], res: 'iron', weak: [],
-      passive: { name: 'きれいな声', desc: 'ライフが0になる場外のとき、一度だけ浮かび上がって耐える' },
+      passive: { name: 'きれいな声', desc: 'ライフが0になる場外のとき、TPが10以上あればTP10を使って一度だけ耐える（ヘロヘロ値+70%、最低80%で復帰）' },
       skills: [
-        { id: 'mt', name: 'MT搭乗', tp: 8, desc: '40秒間メカに乗る（パワー・重さ大幅アップ）' },
-        { id: 'sherpa', name: '補給シェルパ', tp: 6, desc: 'ヘロヘロ値0、40秒TP2倍' },
-        { id: 'muku', name: '無垢', tp: 6, desc: '狙った相手にタピオカパン', aim: true },
-        { id: 'positive', name: 'ポジティブ思考', tp: 7, desc: '全ステータス+1（1回のみ）' },
+        { id: 'mt', name: 'MT搭乗', tp: 14, desc: '20秒間メカに乗る（パワー・重さアップ、壊れると降りる）' },
+        { id: 'sherpa', name: '補給シェルパ', tp: 8, desc: 'ヘロヘロ値-35%、40秒TP2倍' },
+        { id: 'muku', name: '無垢', tp: 9, desc: '狙った相手に8秒のタピオカパン（うぃきっとを攻撃できない）', aim: true },
+        { id: 'positive', name: 'ポジティブ思考', tp: 14, desc: '全ステータス+1（1回のみ）' },
       ],
     },
   };

@@ -8,7 +8,7 @@ window.Settings = (function () {
     ['head', '頭突き', 'KeyF'], ['guard', 'ガード（長押し）', 'KeyC'],
     ['s1', 'スキル1', 'Digit1'], ['s2', 'スキル2', 'Digit2'], ['s3', 'スキル3', 'Digit3'], ['s4', 'スキル4', 'Digit4'],
     ['v', 'キャラ固有アクション', 'KeyV'], ['g', 'リズム（ヒロ専用）', 'KeyG'],
-    ['use', 'アイテムを使う', 'KeyE'], ['drop', 'アイテムを投げる', 'KeyQ'], ['shop', 'アイテム交換所', 'KeyT'],
+    ['use', 'アイテムを使う（武器も）', 'KeyE'], ['drop', 'アイテムを投げる', 'KeyQ'], ['shop', 'アイテム交換所', 'KeyT'],
     ['camL', 'カメラを左に回す', 'KeyZ'], ['camR', 'カメラを右に回す', 'KeyX'],
     ['help', '操作説明', 'KeyH'], ['mute', '音のオン／オフ', 'KeyM'],
   ];

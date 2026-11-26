@@ -62,13 +62,19 @@ window.AI = (function () {
       const sk = GD.CHARS[p.char].skills;
       if (Math.random() < 0.18 + lvl * 0.05) {
         const k = (Math.random() * sk.length) | 0;
-        if (p.tp >= sk[k].tp) press(inp, 's' + (k + 1));
+        // 自分に不利な状態異常をかけるスキルはCPUは使わない（ゆるるはマジギレ・狂気が無害）
+        const selfBad = { surume: 1, kirinuki: 1, rinri: p.char !== 'yururu', kichige: p.char !== 'yururu' && Math.random() < 0.6 };
+        if (p.tp >= sk[k].tp && !selfBad[sk[k].id]) press(inp, 's' + (k + 1));
       }
-      if (GD.CHARS[p.char].passive.special && GD.CHARS[p.char].passive.special !== 'scythe' && p.spCD <= 0 && Math.random() < 0.15) { inp.sel = (Math.random() * 11) | 0; press(inp, 'v'); }
+      const sp = GD.CHARS[p.char].passive.special;
+      const near = best && len2(best.x - p.x, best.z - p.z) < (sp === 'bike' ? 9 : 30);
+      if (sp && sp !== 'scythe' && sp !== 'rhythm' && p.spCD <= 0 && g.t > 4 && near && Math.random() < 0.15) { inp.sel = (Math.random() * 11) | 0; press(inp, 'v'); }
       if (p.item && !GD.ITEMS[p.item].weapon && !GD.ITEMS[p.item].cookie && Math.random() < 0.3) press(inp, 'use');
-      if (p.item && GD.ITEMS[p.item].cookie && g.mars) press(inp, 'use');
-      if (p.ticket > 0) inp.buy = { seq: (inp.buy ? inp.buy.seq : 0) + 1, item: g.mars ? 'sst' : GD.SHOP_ITEMS[(Math.random() * 9) | 0] };
+      if (p.item === 'sst2' && g.mars) press(inp, 'use');
+      if (p.ticket > 0) inp.buy = { seq: (inp.buy ? inp.buy.seq : 0) + 1, item: g.mars ? 'sst' : g.shopList[(Math.random() * g.shopList.length) | 0] };
     }
+    // SST：TPがあれば長押しで改造、なければ短く押して使う
+    if (p.item === 'sst' && g.mars) { A.sh = (A.sh || 0) + 1; inp.b.use = p.tp >= 20 ? true : A.sh % 30 < 6; } else A.sh = 0;
     const t = g.players.find((q) => q.id === A.target);
     let gx = p.x, gz = p.z, want = 0;
     if (A.itemGoal) {
@@ -114,9 +120,10 @@ window.AI = (function () {
     if (t && !A.itemGoal) {
       const td = len2(t.x - p.x, t.z - p.z);
       const W = p.item && GD.ITEMS[p.item].weapon && p.item !== 'monitor' ? p.item : null;
-      if (W === 'ar' && td < 20) inp.b.punch = true;
-      else if (W === 'sr' && td < 35) { A.sr = (A.sr || 0) + dt; inp.b.punch = A.sr < 0.8; if (A.sr > 1) A.sr = 0; }
-      else if (W === 'sg' && td < 4.5) press(inp, 'punch');
+      if (W === 'ar' && td < 20) inp.b.use = true;
+      else if (W === 'sr' && td < 35) { A.sr = (A.sr || 0) + dt; inp.b.use = A.sr < 0.8; if (A.sr > 1) A.sr = 0; }
+      else if (W === 'sg' && td < 4.5) press(inp, 'use');
+      else if (p.item === 'monitor' && td < 1.6 && Math.random() < 0.3) press(inp, 'use');
       else if (td < 1.5 && Math.abs(t.y - p.y) < 1.4) {
         if ((t.stun > 0 || t.hero > 80 || t.ledge) && !t.grabbedBy && Math.random() < 0.15 + lvl * 0.1) inp.b.grab = true;
         else if (Math.random() < 0.05 + lvl * 0.04) {
