@@ -1,0 +1,8 @@
+{
+  "name": "yujo-breakers-lan-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "友情ブレイカーズのLAN対戦用サーバー",
+  "main": "server.js",
+  "dependencies": { "peer": "1.0.2" }
+}

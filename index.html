@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>友情ブレイカーズ - 3D乱闘パーティー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vig"></div>
+<div id="gamechu" class="hidden"><canvas width="400" height="600"></canvas><div class="lb">別ゲー起動中…（ゲーム中毒）</div></div>
+
+<!-- タイトル -->
+<div id="title" class="screen">
+  <div class="logo"><div class="l1">友情ブレイカーズ</div><div class="l2"><span>3D乱闘パーティー</span></div></div>
+  <div class="panel titlebox">
+    <div><label class="lab">プレイヤー名</label><input id="name" class="txt" maxlength="10" placeholder="なまえ"></div>
+    <button class="btn" id="bSolo">CPUと遊ぶ（ひとりで）</button>
+    <button class="btn pink" id="bHost">オンラインの部屋を作る</button>
+    <div class="row"><input id="roomIn" class="txt" maxlength="5" placeholder="部屋コード"><button class="btn cyan" id="bJoin" style="flex:0 0 auto">参加</button></div>
+    <div class="err" id="tErr"></div>
+    <div class="row"><button class="btn white small" id="bHelp">操作説明</button><button class="btn white small" id="bRules">ルール説明</button><button class="btn white small" id="bSet">設定</button></div>
+    <div class="tiny">オンライン対戦はブラウザ同士の直接通信です。接続の仲介にPeerJSの無料サーバーを使うのでネット接続が必要です。</div>
+  </div>
+</div>
+
+<!-- キャラ選択 -->
+<div id="select" class="screen hidden">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between"><div class="h1" style="flex:0 0 auto">キャラクターを選ぶ</div><button class="btn small" id="bSelOk" style="flex:0 0 auto">これにする！</button></div>
+    <div class="selwrap"><div class="grid" id="cards"></div><div class="detail" id="detail"></div></div>
+  </div>
+</div>
+
+<!-- ロビー -->
+<div id="lobby" class="screen hidden">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div style="flex:0 0 auto">
+        <div class="h1" id="lbTitle">ロビー</div>
+        <div id="codeBox"><div class="tiny">部屋コード（友達に伝えてね）</div><div class="row" style="gap:10px"><div class="code" id="code">-----</div><button class="btn small white" id="bCopy" style="flex:0 0 auto">コピー</button></div></div>
+      </div>
+      <div style="flex:0 0 auto;text-align:right;display:flex;gap:8px"><button class="btn small white" id="bSet2">設定</button><button class="btn small cyan" id="bChar">キャラ変更</button></div>
+    </div>
+    <div class="members" id="members"></div>
+    <div id="hostOpts">
+      <div class="row" style="gap:18px;flex-wrap:wrap;margin-bottom:6px">
+        <div style="flex:0 0 auto"><label class="lab">モード</label><div class="seg" id="segMode"><button data-v="0" class="on">個人戦</button><button data-v="1">チーム戦</button></div></div>
+        <div id="teamOpts" class="row hidden" style="flex:0 0 auto;gap:18px">
+          <div style="flex:0 0 auto"><label class="lab">チーム数</label><div class="seg" id="segTeams"><button data-v="2" class="on">2</button><button data-v="3">3</button><button data-v="4">4</button></div></div>
+          <div style="flex:0 0 auto"><label class="lab">味方への攻撃</label><div class="seg" id="segFF"><button data-v="0" class="on">当たらない</button><button data-v="1">当たる</button></div></div>
+        </div>
+      </div>
+      <div class="row" style="gap:18px;flex-wrap:wrap">
+        <div style="flex:0 0 auto"><label class="lab">ライフ</label><div class="seg" id="segLives"><button data-v="1">1</button><button data-v="2" class="on">2</button><button data-v="3">3</button></div></div>
+        <div style="flex:0 0 auto"><label class="lab">CPUの数</label><div class="seg" id="segCpu"><button data-v="0">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="3" class="on">3</button><button data-v="5">5</button><button data-v="7">7</button></div></div>
+        <div style="flex:0 0 auto"><label class="lab">CPUの強さ</label><div class="seg" id="segLvl"><button data-v="1">よわい</button><button data-v="2" class="on">ふつう</button><button data-v="3">つよい</button></div></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn white" id="bLeave" style="flex:0 0 auto">もどる</button>
+      <div class="tiny" id="lbNote" style="flex:1;text-align:center"></div>
+      <button class="btn pink" id="bStart" style="flex:0 0 auto">スタート！</button>
+    </div>
+  </div>
+</div>
+
+<!-- マップ投票 -->
+<div id="vote" class="screen hidden">
+  <div class="panel" style="width:min(1100px,96vw)">
+    <div class="row" style="justify-content:space-between"><div class="h1" style="flex:0 0 auto">マップ投票</div><div style="flex:0 0 auto;text-align:right"><div class="code" id="voteT" style="font-size:30px;letter-spacing:.05em">残り 12秒</div><div class="tiny" id="voteN"></div></div></div>
+    <div class="tiny" style="margin-bottom:10px">遊びたいマップをクリック！一番票が多いマップに決まります（同票はランダム）</div>
+    <div class="grid votegrid" id="voteGrid"></div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="timer"><div class="t" id="hT">0:00</div><div class="ph" id="hPh">ギミック期</div><div class="nx" id="hNx"></div></div>
+  <div id="marsbar" class="hidden"><div class="nm" id="mName">Mars</div><div class="hp"><b id="mHp"></b></div><div class="sub" id="mSub"></div></div>
+  <div class="board" id="board"></div>
+  <div class="sts" id="sts"></div>
+  <div class="me">
+    <div class="face"><img id="hFace"></div>
+    <div class="info">
+      <div class="row" style="align-items:flex-end"><div class="hero" id="hHero">0<small>%</small></div><div style="flex:0 0 auto;text-align:right"><div class="lives" id="hLives"></div><div class="tiny" id="hKills"></div></div></div>
+      <div class="tpbar"><b id="hTp"></b><span id="hTpN">TP 0/30</span></div>
+    </div>
+    <div class="skills" id="hSk"></div>
+    <div class="slot"><div class="tiny">アイテム [E]使う [Q]投げる</div><div class="big" id="hItem">なし</div><div class="tiny" id="hTk"></div></div>
+  </div>
+  <div class="selbox hidden" id="hSel"></div>
+  <div class="cross"></div>
+  <div class="respawn hidden" id="hResp"></div>
+  <div class="hint" id="hint">[H] 操作説明　[Tab] 順位　[M] 音</div>
+  <div id="banners"></div>
+  <div id="arrows"></div>
+</div>
+
+<!-- 操作説明 -->
+<div id="help" class="ov hidden"><div class="panel">
+  <div class="h1">操作説明</div>
+  <div class="keys" id="helpKeys"></div>
+  <div style="text-align:right;margin-top:14px"><button class="btn small" data-close>とじる</button></div>
+</div></div>
+
+<!-- ルール説明 -->
+<div id="rules" class="ov hidden"><div class="panel rulebook">
+  <div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="h1" style="flex:0 0 auto;margin:0">ルール説明</div><button class="btn small" data-close style="flex:0 0 auto">とじる</button></div>
+  <div class="rb">
+    <div class="rbnav" id="rbNav"></div>
+    <div class="rbmain">
+      <div class="vbox"><video id="rbVid" muted loop playsinline autoplay></video><div class="vnone hidden" id="rbNone"></div></div>
+      <h3 id="rbTitle"></h3>
+      <div id="rbText" class="rbtext"></div>
+      <div class="row" style="margin-top:10px"><button class="btn small white" id="rbPrev" style="flex:0 0 auto">← 前へ</button><div class="tiny" id="rbPage" style="text-align:center"></div><button class="btn small" id="rbNext" style="flex:0 0 auto">次へ →</button></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 設定 -->
+<div id="settings" class="ov hidden"><div class="panel" style="width:min(820px,94vw)">
+  <div class="row" style="justify-content:space-between"><div class="h1" style="flex:0 0 auto">設定</div><button class="btn small white" id="setReset" style="flex:0 0 auto">初期値に戻す</button></div>
+  <div class="seg" id="setTabs" style="margin-bottom:14px"><button data-t="keys" class="on">操作・キー割り当て</button><button data-t="cam">カメラ・感度</button><button data-t="snd">音</button><button data-t="gfx">画質</button></div>
+  <div id="setBody" data-tab="keys"></div>
+  <div class="tiny" style="margin-top:10px">設定は自動で保存され、次に開いたときも残ります</div>
+  <div style="text-align:right;margin-top:10px"><button class="btn small" data-close>とじる</button></div>
+</div></div>
+
+<!-- 交換所 -->
+<div id="shop" class="ov hidden"><div class="panel">
+  <div class="h1">アイテム交換所 <span class="tiny" id="shopTk"></span></div>
+  <div class="shopgrid" id="shopGrid"></div>
+  <div class="tiny" style="margin-top:10px">数字キーかクリックで交換 ／ T か Esc でとじる</div>
+</div></div>
+
+<!-- 一時停止 -->
+<div id="pause" class="ov hidden"><div class="panel" style="display:flex;flex-direction:column;gap:12px;width:360px">
+  <div class="h1">一時停止中</div>
+  <div class="tiny" id="pauseNote">オンライン対戦中はゲームは止まりません</div>
+  <button class="btn" id="bResume">つづける</button>
+  <button class="btn white" id="bHelp2">操作説明</button>
+  <button class="btn white" id="bSet3">設定</button>
+  <button class="btn white" id="bRules2">ルール説明</button>
+  <button class="btn white" id="bQuit">タイトルへ戻る</button>
+</div></div>
+
+<!-- 結果 -->
+<div id="result" class="ov hidden"><div class="panel res" style="width:640px">
+  <h2 id="resT">結果</h2>
+  <table id="resTb"></table>
+  <div class="row" style="margin-top:16px"><button class="btn white" id="bResTitle">タイトルへ</button><button class="btn pink" id="bResLobby">もう一回！</button></div>
+  <div class="tiny" id="resNote" style="text-align:center;margin-top:8px"></div>
+</div></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/peerjs.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/render.js"></script>
+<script src="js/net.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

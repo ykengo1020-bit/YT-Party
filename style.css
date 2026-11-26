@@ -1,0 +1,225 @@
+:root {
+  --ink: #15121f; --paper: #fff8ec; --yel: #ffd23b; --pink: #ff4d8d; --cyan: #3be2ff; --vio: #7c5cff; --red: #ff4b4b; --grn: #3ee089;
+  --font: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1430; font-family: var(--font); color: var(--ink); user-select: none; }
+#c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+.hidden { display: none !important; }
+button { font-family: var(--font); cursor: pointer; }
+
+/* ---------- 共通パネル ---------- */
+.screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; }
+.panel { background: var(--paper); border: 4px solid var(--ink); border-radius: 22px; box-shadow: 8px 8px 0 var(--ink); padding: 26px 30px; }
+.btn { font-weight: 900; font-size: 20px; padding: 14px 22px; border: 4px solid var(--ink); border-radius: 16px; background: var(--yel); box-shadow: 5px 5px 0 var(--ink); transition: transform .08s, box-shadow .08s; color: var(--ink); }
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--ink); }
+.btn:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--ink); }
+.btn.pink { background: var(--pink); color: #fff; }
+.btn.cyan { background: var(--cyan); }
+.btn.white { background: #fff; }
+.btn.small { font-size: 15px; padding: 8px 14px; border-width: 3px; box-shadow: 3px 3px 0 var(--ink); border-radius: 12px; }
+.btn:disabled { filter: grayscale(1) opacity(.6); cursor: not-allowed; }
+input.txt { font-family: var(--font); font-weight: 800; font-size: 20px; padding: 10px 14px; border: 4px solid var(--ink); border-radius: 14px; background: #fff; width: 100%; outline: none; }
+input.txt:focus { border-color: var(--vio); }
+label.lab { font-weight: 900; font-size: 14px; display: block; margin: 10px 0 6px; letter-spacing: .05em; }
+
+/* ---------- タイトル ---------- */
+#title { flex-direction: column; gap: 18px; background: radial-gradient(ellipse at 50% 120%, rgba(0,0,0,.0), rgba(20,10,40,.35)); }
+.logo { text-align: center; transform: rotate(-3deg); filter: drop-shadow(6px 6px 0 var(--ink)); }
+.logo .l1 { font-size: 86px; font-weight: 900; color: var(--yel); -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; line-height: 1; letter-spacing: .02em; }
+.logo .l2 { font-size: 30px; font-weight: 900; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; margin-top: 4px; }
+.logo .l2 span { background: var(--pink); padding: 2px 14px; border-radius: 10px; border: 3px solid var(--ink); -webkit-text-stroke: 0; color: #fff; }
+.titlebox { width: 440px; display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row > * { flex: 1; }
+.tiny { font-size: 12px; color: #6b6378; font-weight: 700; }
+.err { color: var(--red); font-weight: 900; min-height: 1.2em; font-size: 14px; }
+
+/* ---------- キャラ選択 ---------- */
+#select .panel { width: min(1100px, 96vw); max-height: 96vh; overflow: auto; padding: 16px 22px; }
+#select .h1 { margin-bottom: 8px; }
+.card .bars { display: grid; gap: 1px; }
+.h1 { font-size: 34px; font-weight: 900; margin: 0 0 14px; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.card { background: #fff; border: 4px solid var(--ink); border-radius: 18px; padding: 8px 10px 12px; cursor: pointer; transition: transform .1s; position: relative; overflow: hidden; }
+.card:hover { transform: translateY(-4px) rotate(-1deg); }
+.card.sel { background: var(--yel); box-shadow: 0 0 0 4px var(--pink); }
+.card img { height: min(19vh, 170px); aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 12px; }
+.card .nm { font-weight: 900; font-size: 22px; text-align: center; margin-top: -6px; }
+.card .bars { font-size: 12px; font-weight: 800; margin-top: 4px; }
+.bar { display: flex; align-items: center; gap: 6px; }
+.bar i { flex: 1; height: 8px; background: #e5e0d8; border-radius: 4px; overflow: hidden; border: 2px solid var(--ink); }
+.bar i b { display: block; height: 100%; background: var(--pink); }
+.detail { margin-top: 12px; display: grid; grid-template-columns: 1fr 1.3fr; gap: 18px; background: #fff; border: 4px solid var(--ink); border-radius: 18px; padding: 14px 18px; }
+.detail h3 { margin: 0 0 4px; font-size: 26px; font-weight: 900; }
+.detail .d { font-size: 14px; font-weight: 700; color: #4b4458; }
+.sk { font-size: 14px; font-weight: 700; padding: 6px 0; border-bottom: 2px dashed #e5e0d8; }
+.sk b { font-weight: 900; }
+.sk .tp { background: var(--cyan); border: 2px solid var(--ink); border-radius: 8px; padding: 0 6px; font-size: 12px; margin-right: 6px; }
+.sk .key { background: var(--ink); color: #fff; border-radius: 6px; padding: 0 6px; font-size: 12px; margin-right: 6px; }
+
+/* ---------- ロビー ---------- */
+#lobby .panel { width: min(860px, 96vw); max-height: 96vh; overflow: auto; }
+.code { font-size: 56px; font-weight: 900; letter-spacing: .18em; background: var(--ink); color: var(--yel); border-radius: 16px; padding: 6px 20px; display: inline-block; }
+.members { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+.mem { background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 6px; text-align: center; font-weight: 900; font-size: 14px; }
+.mem img { width: 70%; display: block; margin: 0 auto; }
+.mem.cpu { background: #efeaf8; }
+.mem .who { font-size: 12px; color: #6b6378; }
+.seg { display: inline-flex; border: 3px solid var(--ink); border-radius: 12px; overflow: hidden; }
+.seg button { border: 0; border-right: 3px solid var(--ink); background: #fff; font-weight: 900; font-size: 16px; padding: 6px 14px; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--yel); }
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+.timer { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
+.timer .t { font-size: 40px; font-weight: 900; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; line-height: 1; }
+.timer .ph { display: inline-block; margin-top: 4px; font-size: 14px; font-weight: 900; background: var(--paper); border: 3px solid var(--ink); border-radius: 10px; padding: 2px 10px; }
+.timer .nx { font-size: 13px; font-weight: 900; color: #fff; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; margin-top: 2px; }
+#marsbar { position: absolute; top: 108px; left: 50%; transform: translateX(-50%); width: min(560px, 70vw); text-align: center; }
+#marsbar .nm { font-size: 20px; font-weight: 900; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+#marsbar .hp { height: 20px; border: 4px solid var(--ink); border-radius: 10px; background: #3a2030; overflow: hidden; }
+#marsbar .hp b { display: block; height: 100%; background: linear-gradient(90deg, #ff4b4b, #ff9f43); transition: width .2s; }
+#marsbar .sub { font-size: 13px; font-weight: 900; color: #fff; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; margin-top: 4px; }
+
+.me { position: absolute; left: 18px; bottom: 18px; display: flex; gap: 12px; align-items: flex-end; transform: scale(var(--hs, 1)); transform-origin: bottom left; }
+.me .face { width: 112px; height: 112px; border: 4px solid var(--ink); border-radius: 22px; background: var(--paper); overflow: hidden; box-shadow: 5px 5px 0 var(--ink); }
+.me .face img { width: 100%; }
+.me .info { background: var(--paper); border: 4px solid var(--ink); border-radius: 18px; padding: 8px 14px; box-shadow: 5px 5px 0 var(--ink); min-width: 250px; }
+.me .hero { font-size: 54px; font-weight: 900; line-height: .95; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+.me .hero small { font-size: 26px; }
+.lives { display: flex; gap: 4px; margin: 4px 0; }
+.lives i { width: 22px; height: 22px; background: var(--pink); border: 3px solid var(--ink); border-radius: 50%; display: inline-block; }
+.lives i.off { background: #ccc; }
+.tpbar { height: 16px; border: 3px solid var(--ink); border-radius: 8px; background: #ddd5c8; overflow: hidden; position: relative; }
+.tpbar b { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--vio)); }
+.tpbar span { position: absolute; inset: 0; text-align: center; font-size: 11px; font-weight: 900; line-height: 10px; }
+.skills { display: flex; gap: 8px; }
+.skill { width: 112px; background: var(--paper); border: 4px solid var(--ink); border-radius: 14px; padding: 6px 8px; box-shadow: 4px 4px 0 var(--ink); position: relative; }
+.skill .k { position: absolute; top: -12px; left: -8px; background: var(--ink); color: #fff; font-weight: 900; border-radius: 8px; padding: 0 7px; font-size: 14px; }
+.skill .n { font-size: 12px; font-weight: 900; line-height: 1.15; min-height: 28px; }
+.skill .c { font-size: 12px; font-weight: 900; color: var(--vio); }
+.skill.na { filter: grayscale(1) opacity(.55); }
+.skill.ready { background: #fffbd1; }
+.skill.sp { background: #ffe1ec; }
+.skill .cd { position: absolute; inset: 0; background: rgba(20,18,31,.55); border-radius: 10px; color: #fff; font-weight: 900; font-size: 22px; display: flex; align-items: center; justify-content: center; }
+.slot { background: var(--paper); border: 4px solid var(--ink); border-radius: 14px; padding: 6px 10px; box-shadow: 4px 4px 0 var(--ink); font-weight: 900; font-size: 13px; min-width: 130px; }
+.slot .big { font-size: 17px; }
+.sts { position: absolute; left: 18px; bottom: calc(150px * var(--hs, 1)); display: flex; flex-wrap: wrap; gap: 6px; max-width: 520px; }
+.chip { font-size: 13px; font-weight: 900; color: #fff; border: 3px solid var(--ink); border-radius: 10px; padding: 2px 8px; -webkit-text-stroke: 0; text-shadow: 1px 1px 0 #000; }
+.board { transform: scale(var(--hs, 1)); transform-origin: top right; position: absolute; right: 14px; top: 14px; background: rgba(255,248,236,.92); border: 4px solid var(--ink); border-radius: 16px; padding: 6px 10px; min-width: 210px; box-shadow: 5px 5px 0 var(--ink); }
+.board .r { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 900; padding: 2px 0; }
+.board .r.out { opacity: .4; text-decoration: line-through; }
+.board .r.mine { color: #b4006a; }
+.board .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); }
+.board .h { margin-left: auto; }
+.banner { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; font-weight: 900; color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-align: center; white-space: nowrap; animation: pop .35s cubic-bezier(.2,1.6,.5,1); }
+@keyframes pop { from { transform: translate(-50%, -50%) scale(.4) rotate(-6deg); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+.hint { position: absolute; bottom: 14px; right: 16px; font-size: 13px; font-weight: 900; color: #fff; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; text-align: right; }
+.cross { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border: 2px solid rgba(255,255,255,.8); border-radius: 50%; }
+.selbox { position: absolute; left: 50%; bottom: calc(200px * var(--hs, 1)); transform: translateX(-50%); font-weight: 900; background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 12px; font-size: 14px; }
+.respawn { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); font-size: 46px; font-weight: 900; color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-align: center; }
+
+/* 状態異常の画面効果 */
+#vig { position: fixed; inset: 0; pointer-events: none; z-index: 4; transition: box-shadow .3s; }
+#vig.maji { box-shadow: inset 0 0 160px 30px rgba(255,30,30,.55); }
+#vig.dark { background: radial-gradient(circle at 50% 55%, transparent 15%, rgba(0,0,0,.85) 60%); }
+#gamechu { position: fixed; left: 0; top: 0; width: 50vw; height: 100vh; z-index: 6; pointer-events: none; background: #111; border-right: 6px solid var(--grn); }
+#gamechu canvas { width: 100%; height: 100%; }
+#gamechu .lb { position: absolute; top: 20px; left: 20px; font-weight: 900; font-size: 22px; color: var(--grn); }
+body.kyouki #c { animation: wob 1.6s infinite; }
+@keyframes wob { 0%,100% { filter: hue-rotate(0); } 50% { filter: hue-rotate(80deg) saturate(1.6); } }
+
+/* ---------- オーバーレイ ---------- */
+.ov { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(20,14,35,.55); }
+.ov .panel { max-width: 92vw; max-height: 92vh; overflow: auto; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-weight: 800; font-size: 15px; }
+.keys kbd { background: var(--ink); color: #fff; border-radius: 6px; padding: 1px 8px; font-family: var(--font); font-weight: 900; white-space: nowrap; }
+.shopgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.shopgrid .it { background: #fff; border: 3px solid var(--ink); border-radius: 12px; padding: 8px; font-weight: 900; font-size: 13px; pointer-events: auto; cursor: pointer; }
+.shopgrid .it span { background: var(--ink); color: #fff; border-radius: 6px; padding: 0 6px; margin-right: 4px; }
+.res h2 { font-size: 40px; font-weight: 900; margin: 0 0 8px; text-align: center; }
+.res table { width: 100%; border-collapse: collapse; font-weight: 900; }
+.res td, .res th { padding: 6px 10px; border-bottom: 3px solid #e5e0d8; text-align: left; }
+.res tr.win td { background: #fff3b0; }
+.toast { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; font-weight: 900; padding: 10px 18px; border-radius: 12px; z-index: 30; }
+
+/* ---------- マップ投票 ---------- */
+.votegrid { grid-template-columns: repeat(4, 1fr); }
+.mapc img, .mapc .rnd { height: min(20vh, 180px); width: auto; margin: 0 auto; display: flex; aspect-ratio: 1; border-radius: 12px; border: 3px solid var(--ink); }
+.mapc .rnd { display: flex; align-items: center; justify-content: center; font-size: 90px; font-weight: 900; background: linear-gradient(135deg, var(--vio), var(--pink)); color: #fff; }
+.mapc .nm { margin-top: 6px; }
+.mapc .d { text-align: center; min-height: 2.4em; }
+.mapc .cnt { text-align: center; color: var(--pink); font-size: 20px; letter-spacing: 2px; min-height: 26px; }
+.mapc.win { background: var(--yel); box-shadow: 0 0 0 5px var(--pink); transform: scale(1.04) rotate(-1deg); }
+.mapc.lose { opacity: .35; }
+
+/* ---------- 設定 ---------- */
+.keygrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; max-height: 52vh; overflow: auto; padding-right: 6px; }
+.krow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; font-size: 14px; border-bottom: 2px dashed #e5e0d8; padding: 3px 0; }
+.kbtn { font-family: var(--font); font-weight: 900; font-size: 14px; min-width: 120px; padding: 5px 10px; border: 3px solid var(--ink); border-radius: 10px; background: #fff; box-shadow: 2px 2px 0 var(--ink); }
+.kbtn:hover { background: #fffbd1; }
+.kbtn.cap { background: var(--pink); color: #fff; animation: blink .6s infinite alternate; }
+@keyframes blink { to { opacity: .6; } }
+.srow { display: grid; grid-template-columns: 240px 1fr 80px; align-items: center; gap: 14px; font-weight: 900; padding: 10px 0; border-bottom: 2px dashed #e5e0d8; }
+.srow input[type=range] { width: 100%; accent-color: var(--pink); height: 22px; }
+.srow b { text-align: right; }
+.sw { position: relative; width: 62px; height: 32px; display: inline-block; }
+.sw input { display: none; }
+.sw i { position: absolute; inset: 0; border: 3px solid var(--ink); border-radius: 20px; background: #ddd; transition: .15s; cursor: pointer; }
+.sw i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); transition: .15s; box-sizing: border-box; }
+.sw input:checked + i { background: var(--grn); }
+.sw input:checked + i::after { left: 32px; }
+#settings { z-index: 25; }
+/* 画面外のプレイヤー矢印 */
+#arrows .ar { position: absolute; width: 34px; height: 34px; margin: -17px; border-radius: 50%; border: 3px solid var(--ink); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 11px; color: #fff; text-shadow: 1px 1px 0 #000; }
+#arrows .ar::before { content: ''; position: absolute; width: 0; height: 0; border: 9px solid transparent; border-left: 14px solid var(--ink); left: 100%; top: 50%; margin-top: -9px; transform-origin: -17px 50%; transform: rotate(var(--r)); }
+
+/* ---------- ルール説明 ---------- */
+.rulebook { width: min(1120px, 96vw); }
+.rb { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+.rbnav { display: flex; flex-direction: column; gap: 6px; max-height: 72vh; overflow: auto; padding-right: 4px; }
+.rbnav button { text-align: left; font-family: var(--font); font-weight: 900; font-size: 14px; padding: 8px 10px; border: 3px solid var(--ink); border-radius: 12px; background: #fff; }
+.rbnav button.on { background: var(--yel); box-shadow: 3px 3px 0 var(--ink); }
+.rbnav button .n { display: inline-block; width: 22px; height: 22px; line-height: 18px; text-align: center; border-radius: 50%; background: var(--ink); color: #fff; font-size: 12px; margin-right: 6px; border: 2px solid var(--ink); }
+.rbnav button .v { float: right; font-size: 11px; color: var(--pink); }
+.rbmain h3 { margin: 10px 0 4px; font-size: 26px; font-weight: 900; }
+.rbtext { font-weight: 700; font-size: 15px; line-height: 1.75; }
+.rbtext b { background: linear-gradient(transparent 60%, #ffe58a 60%); }
+.rbtext table { border-collapse: collapse; margin-top: 4px; }
+.rbtext td { border-bottom: 2px dashed #e5e0d8; padding: 3px 12px 3px 0; }
+.vbox { position: relative; width: 100%; aspect-ratio: 16/9; max-height: 46vh; background: #1b1430; border: 4px solid var(--ink); border-radius: 16px; overflow: hidden; box-shadow: 5px 5px 0 var(--ink); }
+.vbox video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vnone { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 22px; text-align: center; padding: 20px; background: linear-gradient(135deg, #3b2a7a, #f08a6a); }
+/* キャラ詳細の技動画 */
+.detail { grid-template-columns: 1fr 1.25fr; }
+.detail .vbox { max-height: 30vh; margin-bottom: 8px; }
+.sk.click { cursor: pointer; border-radius: 10px; padding: 6px 8px; margin: 0 -8px; }
+.sk.click:hover { background: #fff7d6; }
+.sk.click.on { background: #ffe58a; }
+.sk .play { float: right; font-size: 12px; font-weight: 900; color: #fff; background: var(--pink); border: 2px solid var(--ink); border-radius: 8px; padding: 0 6px; }
+#select .panel { max-height: 98vh; }
+
+/* キャラ選択：左にカード、右に詳細 */
+#select .panel { width: min(1280px, 97vw); }
+.selwrap { display: grid; grid-template-columns: 1fr 1.08fr; gap: 14px; align-items: start; }
+.selwrap .grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.selwrap .card { padding: 6px 6px 8px; border-radius: 14px; }
+.selwrap .card img { height: min(19vh, 170px); }
+.selwrap .card .nm { font-size: 17px; margin-top: -4px; }
+.selwrap .card .bars { font-size: 10px; }
+.selwrap .bar i { height: 6px; border-width: 1.5px; }
+.selwrap .detail { display: block; margin-top: 0; padding: 12px 14px; max-height: calc(96vh - 110px); overflow: auto; }
+.selwrap .detail .vbox { max-height: none; margin-bottom: 8px; }
+.selwrap .detail h3 { font-size: 22px; }
+.selwrap .sk { font-size: 13px; padding: 5px 8px; }
+
+/* ---------- チーム戦 ---------- */
+.mem { position: relative; }
+.mem.tclick { cursor: pointer; transition: transform .1s; }
+.mem.tclick:hover { transform: translateY(-3px); }
+.mem.mine { background: #fffbd1; }
+.tbadge { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); color: #fff; font-weight: 900; font-size: 12px; border: 2px solid var(--ink); border-radius: 8px; padding: 0 8px; white-space: nowrap; text-shadow: 1px 1px 0 #000; }
+.board .thead { color: #fff; font-weight: 900; font-size: 13px; border-radius: 8px; padding: 1px 8px; margin-top: 4px; text-shadow: 1px 1px 0 #000; border: 2px solid var(--ink); }
+.board .thead span { float: right; font-size: 11px; }
