@@ -129,133 +129,278 @@ window.Render = (function () {
   }
 
   // ---------- キャラクター ----------
-  const outlineMat = new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.BackSide });
-  function std(color, o = {}) { return new THREE.MeshStandardMaterial({ color, roughness: o.r ?? 0.55, metalness: o.m ?? 0.0, emissive: o.e ?? 0x000000 }); }
+  const outlineMat = new THREE.MeshBasicMaterial({ color: 0x15121f, side: THREE.BackSide });
+  function std(color, o = {}) { return new THREE.MeshStandardMaterial({ color, roughness: o.r ?? 0.55, metalness: o.m ?? 0.0, emissive: o.e ?? 0x000000, transparent: !!o.t, opacity: o.t ?? 1 }); }
+  // トゥーン調（アニメ風の3段階の陰影）
+  const toonGrad = (() => {
+    const d = new Uint8Array([110, 110, 110, 255, 190, 190, 190, 255, 255, 255, 255, 255]);
+    const t = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t;
+  })();
+  function toon(color, o = {}) { return new THREE.MeshToonMaterial({ color: new THREE.Color(color).convertSRGBToLinear(), gradientMap: toonGrad, emissive: o.e ?? 0x000000, transparent: !!o.t, opacity: o.t ?? 1 }); }
+  // 縁取り（裏返した少し大きいメッシュ）
+  function ol(mesh, k = 1.07) { const o = new THREE.Mesh(mesh.geometry, outlineMat); o.scale.setScalar(k); o.raycast = () => {}; mesh.add(o); return mesh; }
+  function M(geo, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (parent) parent.add(m); return m; }
+  // 2点を結ぶ円柱（フレームや脚に使う）
+  function rod(a, b, r, mat, parent, seg = 8) {
+    const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b), d = vb.clone().sub(va), L = d.length();
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, seg), mat);
+    m.position.copy(va).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    if (parent) parent.add(m); return m;
+  }
+  const texCache = {};
+  function labelTex(key, w, h, draw) {
+    if (texCache[key]) return texCache[key];
+    const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; texCache[key] = t; return t;
+  }
+  // にもの大鎌
+  function makeScythe() {
+    const g = new THREE.Group();
+    const wood = toon(0x2a1a14), metal = std(0x9ca3af, { m: 0.85, r: 0.25 }), red = std(0xb91c1c, { m: 0.6, r: 0.28, e: 0x3f0606 });
+    ol(M(new THREE.CylinderGeometry(0.035, 0.04, 1.9, 8), wood, 0, 0, 0, g), 1.25);
+    for (const y of [-0.55, -0.4, 0.15, 0.3]) { const r = M(new THREE.TorusGeometry(0.045, 0.014, 6, 12), std(0xdc2626, { r: 0.6 }), 0, y, 0, g); r.rotation.x = Math.PI / 2; }
+    M(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 10), metal, 0, 0.92, 0, g);
+    M(new THREE.ConeGeometry(0.045, 0.16, 8), metal, 0, -1.02, 0, g).rotation.x = Math.PI;
+    // 三日月形の刃
+    const sh = new THREE.Shape();
+    sh.moveTo(0, 0.06); sh.quadraticCurveTo(0.7, 0.42, 1.25, -0.28); sh.quadraticCurveTo(0.78, 0.0, 0.02, -0.12); sh.lineTo(0, 0.06);
+    const blade = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1, curveSegments: 18 }), red);
+    blade.position.set(0.02, 0.86, -0.0175); g.add(blade); ol(blade, 1.04);
+    // 刃の光るふち
+    const edge = new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(new THREE.Vector3(0.02, 0.94, 0), new THREE.Vector3(0.79, 0.72, 0), new THREE.Vector3(1.27, 0.58, 0)), 16, 0.016, 5, false),
+      new THREE.MeshBasicMaterial({ color: 0xff8a8a }));
+    g.add(edge);
+    // 根元の飾り
+    const gem = M(new THREE.OctahedronGeometry(0.07), std(0xff1f4b, { e: 0xaa0022, r: 0.2 }), 0.02, 0.86, 0.04, g);
+    g.userData.gem = gem;
+    g.traverse((o) => { if (o.isMesh && o.material !== outlineMat) o.castShadow = true; });
+    return g;
+  }
   function buildChar(key) {
     const C = CHARS[key];
     const root = new THREE.Group();
     const inner = new THREE.Group(); root.add(inner);
-    const bodyMat = std(C.color); const subMat = std(C.sub);
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.72, 8, 18), bodyMat);
-    body.position.y = 0.86; body.castShadow = true; inner.add(body);
-    const ol = new THREE.Mesh(body.geometry, outlineMat); ol.scale.setScalar(1.06); body.add(ol);
+    const bodyMat = toon(C.color); const subMat = toon(C.sub);
+    const lightCol = new THREE.Color(C.color).lerp(new THREE.Color(0xffffff), 0.38);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.72, 10, 22), bodyMat);
+    body.position.y = 0.86; body.castShadow = true; inner.add(body); ol(body, 1.055);
     // おなか
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 12), std(new THREE.Color(C.color).lerp(new THREE.Color(0xffffff), 0.35)));
-    belly.scale.set(1, 1.1, 0.5); belly.position.set(0, -0.15, 0.24); body.add(belly);
-    // 目
-    const eyeW = std(0xffffff, { r: 0.2 }), eyeB = std(0x111111, { r: 0.1, e: 0x000000 });
+    const belly = M(new THREE.SphereGeometry(0.34, 20, 14), toon(lightCol), 0, -0.17, 0.3, body);
+    belly.scale.set(1, 1.1, 0.55);
+    // 目（白目・黒目・ハイライト）
+    const eyeW = toon(0xffffff), iris = toon(0x1b1530), hiM = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const eyes = [];
     for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), eyeW); e.position.set(0.16 * s, 0.38, 0.38); e.scale.z = 0.6; body.add(e);
-      const pu = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), eyeB); pu.position.set(0, 0, 0.08); e.add(pu); eyes.push(e);
+      const e = M(new THREE.SphereGeometry(0.115, 16, 12), eyeW, 0.16 * s, 0.37, 0.385, body); e.scale.z = 0.55;
+      ol(e, 1.12);
+      const pu = M(new THREE.SphereGeometry(0.075, 14, 10), iris, 0, -0.005, 0.075, e); pu.scale.z = 0.7;
+      M(new THREE.SphereGeometry(0.026, 8, 6), hiM, 0.028, 0.035, 0.115, e);
+      M(new THREE.SphereGeometry(0.013, 6, 5), hiM, -0.03, -0.03, 0.115, e);
+      eyes.push(e);
     }
-    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 6, 12, Math.PI), eyeB); mouth.position.set(0, 0.2, 0.43); mouth.rotation.z = Math.PI; body.add(mouth);
-    // 腕
+    // 眉
+    const brows = [];
+    for (const s of [-1, 1]) { const b = M(new THREE.BoxGeometry(0.14, 0.032, 0.03), toon(0x1b1530), 0.16 * s, 0.53, 0.415, body); b.rotation.z = 0.12 * s; b.userData.s = s; brows.push(b); }
+    // ほっぺ
+    const blushM = new THREE.MeshBasicMaterial({ color: 0xff6b8b, transparent: true, opacity: 0.45, depthWrite: false });
+    for (const s of [-1, 1]) { const c = M(new THREE.CircleGeometry(0.065, 16), blushM, 0.3 * s, 0.24, 0.355, body); c.rotation.y = 0.62 * s; }
+    // 口（ふだんはにっこり、殴られると開く）
+    const mouth = M(new THREE.TorusGeometry(0.07, 0.02, 6, 14, Math.PI), toon(0x1b1530), 0, 0.2, 0.432, body); mouth.rotation.z = Math.PI;
+    const mouthO = M(new THREE.SphereGeometry(0.07, 12, 10), toon(0x5b0f1e), 0, 0.17, 0.42, body); mouthO.scale.set(1, 1.15, 0.45); mouthO.visible = false; ol(mouthO, 1.15);
+    M(new THREE.SphereGeometry(0.04, 8, 6), toon(0xff7b93), 0, -0.03, 0.03, mouthO).scale.set(1.2, 0.6, 0.6);
+    // 腕と手
     const arms = [];
     for (const s of [-1, 1]) {
       const piv = new THREE.Group(); piv.position.set(0.5 * s, 1.0, 0); inner.add(piv);
-      const a = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.3, 4, 10), bodyMat); a.position.y = -0.24; a.castShadow = true; piv.add(a);
-      const f = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), subMat); f.position.y = -0.5; f.castShadow = true; piv.add(f);
+      const a = M(new THREE.CapsuleGeometry(0.115, 0.28, 4, 10), bodyMat, 0, -0.23, 0, piv); a.castShadow = true; ol(a, 1.12);
+      const f = M(new THREE.SphereGeometry(0.165, 14, 12), subMat, 0, -0.5, 0, piv); f.castShadow = true; ol(f, 1.1);
+      const th = M(new THREE.SphereGeometry(0.07, 8, 6), subMat, -0.1 * s, 0.04, 0.08, f); th.scale.set(1, 1.3, 1);
       arms.push({ piv, f });
     }
+    // 足と靴
     const legs = [];
+    const shoeM = toon(new THREE.Color(C.sub).lerp(new THREE.Color(0x000000), 0.25)), soleM = toon(0xf5f1ea);
     for (const s of [-1, 1]) {
       const piv = new THREE.Group(); piv.position.set(0.2 * s, 0.34, 0); inner.add(piv);
-      const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.14, 4, 8), subMat); l.position.y = -0.17; l.castShadow = true; piv.add(l);
+      const l = M(new THREE.CapsuleGeometry(0.12, 0.12, 4, 8), subMat, 0, -0.15, 0, piv); l.castShadow = true; ol(l, 1.12);
+      const sh = M(new THREE.SphereGeometry(0.15, 14, 10), shoeM, 0, -0.28, 0.05, piv); sh.scale.set(1, 0.62, 1.35); sh.castShadow = true; ol(sh, 1.1);
+      M(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 14), soleM, 0, -0.33, 0.05, piv).scale.set(1, 1, 1.35);
       legs.push(piv);
     }
     // アクセサリー
     const acc = new THREE.Group(); body.add(acc);
-    const black = std(0x111111);
+    const black = toon(0x15121f);
+    let scythe = null;
     switch (C.acc) {
-      case 'glasses':
-        for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.025, 6, 16), black); r.position.set(0.16 * s, 0.38, 0.45); acc.add(r); }
-        { const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.025, 0.025), black); b.position.set(0, 0.4, 0.46); acc.add(b); }
-        break;
-      case 'helmet': {
-        const h = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), std(0xf97316, { r: 0.25, m: 0.3 })); h.position.y = 0.42; acc.add(h);
-        const v = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.08, 0.1), std(0x111827, { r: 0.1, m: 0.6 })); v.position.set(0, 0.56, 0.42); acc.add(v);
-        break;
-      }
-      case 'headphones': {
-        const band = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.04, 6, 20, Math.PI), black); band.position.y = 0.4; acc.add(band);
-        for (const s of [-1, 1]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.1, 14), std(0x10b981, { e: 0x064e3b })); c.rotation.z = Math.PI / 2; c.position.set(0.47 * s, 0.4, 0); acc.add(c); }
+      case 'glasses': { // kenken：黒ぶちメガネ
+        const lens = new THREE.MeshStandardMaterial({ color: 0xbfe3ff, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.3 });
+        for (const s of [-1, 1]) {
+          const r = M(new THREE.TorusGeometry(0.13, 0.026, 8, 20), black, 0.16 * s, 0.37, 0.455, acc); r.scale.y = 0.85;
+          M(new THREE.CircleGeometry(0.12, 18), lens, 0.16 * s, 0.37, 0.452, acc).scale.y = 0.85;
+          rod([0.29 * s, 0.39, 0.43], [0.43 * s, 0.4, 0.05], 0.016, black, acc);
+        }
+        M(new THREE.BoxGeometry(0.08, 0.025, 0.025), black, 0, 0.39, 0.47, acc);
+        // パソコン用の小さなキーボード柄のバッジ
+        M(new THREE.BoxGeometry(0.16, 0.08, 0.02), toon(0xfacc15), 0.2, -0.2, 0.44, acc).rotation.z = -0.2;
         break;
       }
-      case 'bandana': {
-        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.12, 20), std(0xdc2626)); b.position.y = 0.55; acc.add(b);
-        const k = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 6), std(0xdc2626)); k.position.set(0, 0.5, -0.5); k.rotation.x = -2.2; acc.add(k);
+      case 'helmet': { // ayu：自転車ヘルメット
+        const hm = toon(0xfb923c), dk = toon(0x7c2d12);
+        const h = M(new THREE.SphereGeometry(0.5, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), hm, 0, 0.42, -0.02, acc); h.scale.set(1, 0.9, 1.12); ol(h, 1.04);
+        for (const x of [-0.18, 0, 0.18]) { const v = M(new THREE.BoxGeometry(0.06, 0.05, 0.5), dk, x, 0.86, -0.05, acc); v.rotation.x = 0.1; }
+        const vi = M(new THREE.BoxGeometry(0.62, 0.06, 0.16), std(0x0f172a, { m: 0.5, r: 0.15 }), 0, 0.6, 0.47, acc); vi.rotation.x = -0.35;
+        for (const s of [-1, 1]) rod([0.42 * s, 0.45, 0.05], [0.3 * s, 0.05, 0.25], 0.018, dk, acc);
         break;
       }
-      case 'cap': {
-        const c = new THREE.Mesh(new THREE.SphereGeometry(0.48, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2.2), std(0x6d28d9)); c.position.y = 0.45; acc.add(c);
-        const br = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 0.35), std(0x4c1d95)); br.position.set(0, 0.5, 0.5); acc.add(br);
+      case 'headphones': { // ヒロ：ゲーミングヘッドホン
+        const band = M(new THREE.TorusGeometry(0.48, 0.05, 8, 24, Math.PI), black, 0, 0.42, 0, acc); ol(band, 1.08);
+        M(new THREE.TorusGeometry(0.48, 0.035, 6, 24, Math.PI * 0.5), toon(0x34d399), 0, 0.44, 0, acc).rotation.z = Math.PI * 0.25;
+        for (const s of [-1, 1]) {
+          const c = M(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 18), black, 0.48 * s, 0.4, 0, acc); c.rotation.z = Math.PI / 2; ol(c, 1.1);
+          const led = M(new THREE.TorusGeometry(0.12, 0.022, 6, 20), new THREE.MeshBasicMaterial({ color: 0x34ffb0 }), 0.55 * s, 0.4, 0, acc); led.rotation.y = Math.PI / 2;
+        }
+        const mic = rod([-0.5, 0.33, 0.05], [-0.28, 0.12, 0.42], 0.018, black, acc);
+        M(new THREE.SphereGeometry(0.045, 8, 6), black, -0.27, 0.11, 0.44, acc);
         break;
       }
-      case 'hardhat': {
-        const c = new THREE.Mesh(new THREE.SphereGeometry(0.49, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), std(0xfacc15, { r: 0.3 })); c.position.y = 0.45; acc.add(c);
-        const br = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.04, 22), std(0xfacc15, { r: 0.3 })); br.position.y = 0.46; acc.add(br);
-        const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.9), std(0xeab308)); ridge.position.y = 0.85; acc.add(ridge);
+      case 'bandana': { // コットン：バンダナ
+        const bm = toon(0xdc2626);
+        const b = M(new THREE.CylinderGeometry(0.47, 0.475, 0.14, 24, 1, true), bm, 0, 0.56, 0, acc); b.material.side = THREE.DoubleSide;
+        for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; M(new THREE.CircleGeometry(0.018, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), Math.sin(a) * 0.478, 0.56, Math.cos(a) * 0.478, acc).lookAt(Math.sin(a) * 2, 0.56, Math.cos(a) * 2); }
+        const kn = M(new THREE.SphereGeometry(0.07, 10, 8), bm, 0, 0.55, -0.48, acc); ol(kn, 1.12);
+        for (const s of [-1, 1]) { const t = M(new THREE.ConeGeometry(0.07, 0.32, 6), bm, 0.09 * s, 0.42, -0.53, acc); t.rotation.set(-0.5, 0, 0.5 * s); ol(t, 1.1); }
         break;
       }
-      case 'hood': {
-        const hd = new THREE.Mesh(new THREE.SphereGeometry(0.52, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), std(0x1f2937)); hd.position.set(0, 0.32, -0.04); acc.add(hd);
-        const sc = new THREE.Group();
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 6), std(0x3f3f46)); sc.add(pole);
-        const blade = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.05, 4, 16, Math.PI * 0.8), std(0xdc2626, { m: 0.5, r: 0.3, e: 0x450a0a })); blade.position.set(0.35, 0.75, 0); sc.add(blade);
-        sc.position.set(0, 0, -0.5); sc.rotation.z = 0.5; acc.add(sc);
+      case 'cap': { // タカラソド：キャップ
+        const cm = toon(0x6d28d9), dk = toon(0x4c1d95);
+        const c = M(new THREE.SphereGeometry(0.485, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2.15), cm, 0, 0.45, 0, acc); ol(c, 1.04);
+        const br = M(new THREE.CylinderGeometry(0.34, 0.34, 0.035, 22, 1, false, -Math.PI / 2, Math.PI), dk, 0, 0.5, 0.36, acc); br.scale.z = 1.25; br.rotation.x = 0.12; ol(br, 1.06);
+        M(new THREE.SphereGeometry(0.05, 8, 6), dk, 0, 0.93, 0, acc);
+        M(new THREE.CircleGeometry(0.1, 16), toon(0xfde047), 0, 0.72, 0.36, acc).rotation.x = -0.6;
         break;
       }
-      case 'ribbon': {
-        for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.3, 8), std(0xec4899)); r.rotation.z = (Math.PI / 2) * s; r.position.set(0.16 * s, 0.72, 0); acc.add(r); }
-        const k = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), std(0xbe185d)); k.position.y = 0.72; acc.add(k);
+      case 'hardhat': { // ゆるる：工事用ヘルメット
+        const hm = toon(0xfacc15);
+        const c = M(new THREE.SphereGeometry(0.49, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), hm, 0, 0.45, 0, acc); ol(c, 1.04);
+        const br = M(new THREE.CylinderGeometry(0.6, 0.62, 0.04, 26), hm, 0, 0.46, 0.03, acc); ol(br, 1.03);
+        M(new THREE.BoxGeometry(0.1, 0.09, 0.92), toon(0xeab308), 0, 0.88, 0, acc);
+        const lamp = M(new THREE.CylinderGeometry(0.08, 0.09, 0.08, 14), black, 0, 0.72, 0.4, acc); lamp.rotation.x = Math.PI / 2 - 0.5;
+        M(new THREE.CircleGeometry(0.065, 14), new THREE.MeshBasicMaterial({ color: 0xfff7c2 }), 0, 0.745, 0.44, acc).rotation.x = -0.5;
+        M(new THREE.BoxGeometry(0.5, 0.05, 0.02), toon(0xf97316), 0, 0.62, 0.46, acc).rotation.x = -0.45;
+        break;
+      }
+      case 'hood': { // にも：フード＋大鎌
+        const hdM = toon(0x1f2937);
+        const hd = M(new THREE.SphereGeometry(0.53, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.6), hdM, 0, 0.3, -0.05, acc); hd.material.side = THREE.DoubleSide; ol(hd, 1.04);
+        const rim = M(new THREE.TorusGeometry(0.43, 0.04, 6, 24), toon(0xdc2626), 0, 0.42, 0.22, acc); rim.rotation.x = -0.25; rim.scale.y = 1.12;
+        const tip = M(new THREE.ConeGeometry(0.16, 0.36, 10), hdM, 0, 0.62, -0.5, acc); tip.rotation.x = -2.0; ol(tip, 1.08);
+        for (const s of [-1, 1]) { rod([0.13 * s, 0.05, 0.43], [0.16 * s, -0.25, 0.4], 0.016, toon(0xe5e7eb), acc); }
+        scythe = makeScythe(); scythe.position.set(0.05, -0.05, -0.55); scythe.rotation.set(0, Math.PI / 2, 0.55); acc.add(scythe);
+        scythe.userData.rest = { p: scythe.position.clone(), r: scythe.rotation.clone(), parent: acc };
+        break;
+      }
+      case 'ribbon': { // うぃきっと：大きなリボン
+        const rm = toon(0xec4899), dk = toon(0xbe185d);
+        for (const s of [-1, 1]) {
+          const lp = M(new THREE.TorusGeometry(0.14, 0.06, 8, 18), rm, 0.2 * s, 0.78, -0.05, acc); lp.scale.set(1.25, 0.85, 0.6); lp.rotation.z = 0.25 * s; ol(lp, 1.08);
+          const tl = M(new THREE.BoxGeometry(0.09, 0.3, 0.03), rm, 0.1 * s, 0.6, -0.1, acc); tl.rotation.z = 0.5 * s; ol(tl, 1.1);
+        }
+        const k = M(new THREE.SphereGeometry(0.08, 10, 8), dk, 0, 0.78, -0.03, acc); ol(k, 1.12);
+        // マイク型のヘアピン（声がかわいい）
+        M(new THREE.SphereGeometry(0.05, 8, 6), toon(0xfde68a), -0.34, 0.55, 0.25, acc);
         break;
       }
     }
     // 頭の上の飾り（気絶の星など）
     const stars = new THREE.Group(); stars.position.y = 2.0; root.add(stars);
-    for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), std(0xfde047, { e: 0xfde047 })); stars.add(s); }
+    for (let i = 0; i < 3; i++) { const st = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), std(0xfde047, { e: 0xfde047 })); stars.add(st); }
     stars.visible = false;
     // MT（メカ）
     const mt = new THREE.Group(); root.add(mt); mt.visible = false;
-    { const g = std(0x64748b, { m: 0.6, r: 0.35 }); const leg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, 0.35), g);
-      for (const s of [-1, 1]) { const l = leg.clone(); l.position.set(0.45 * s, 0.45, 0); mt.add(l); }
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 1.1), g); torso.position.y = 1.3; mt.add(torso);
-      const cock = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.2), std(0x38bdf8, { e: 0x0c4a6e, m: 0.3, r: 0.1 })); cock.position.set(0, 1.45, 0.56); mt.add(cock);
-      for (const s of [-1, 1]) { const a = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.0, 0.4), g); a.position.set(0.95 * s, 1.15, 0.1); mt.add(a); }
+    {
+      const g = std(0x7b8798, { m: 0.65, r: 0.32 }), dk = std(0x334155, { m: 0.6, r: 0.4 }), ac = std(0xf472b6, { m: 0.3, r: 0.4 }), glow = new THREE.MeshBasicMaterial({ color: 0x67e8f9 });
+      for (const s of [-1, 1]) {
+        M(new THREE.BoxGeometry(0.34, 0.5, 0.36), g, 0.45 * s, 0.65, 0, mt);
+        M(new THREE.SphereGeometry(0.17, 12, 8), dk, 0.45 * s, 0.4, 0.05, mt);
+        M(new THREE.BoxGeometry(0.42, 0.18, 0.6), dk, 0.45 * s, 0.1, 0.08, mt);
+        const sh = M(new THREE.SphereGeometry(0.34, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), ac, 0.95 * s, 1.62, 0.05, mt); sh.scale.set(1, 0.7, 1.1);
+        M(new THREE.BoxGeometry(0.38, 0.95, 0.38), g, 0.95 * s, 1.12, 0.1, mt);
+        const gun = M(new THREE.CylinderGeometry(0.09, 0.11, 0.6, 12), dk, 0.95 * s, 0.75, 0.38, mt); gun.rotation.x = Math.PI / 2;
+        M(new THREE.CircleGeometry(0.06, 10), glow, 0.95 * s, 0.75, 0.69, mt);
+      }
+      const torso = M(new THREE.CylinderGeometry(0.72, 0.6, 0.95, 8), g, 0, 1.32, 0, mt); torso.rotation.y = Math.PI / 8;
+      const cock = M(new THREE.SphereGeometry(0.42, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.4 }), 0, 1.78, 0.05, mt);
+      M(new THREE.BoxGeometry(0.9, 0.12, 0.05), glow, 0, 1.42, 0.62, mt);
+      M(new THREE.BoxGeometry(1.0, 0.18, 0.06), ac, 0, 1.0, 0.6, mt);
+      rod([0.3, 1.8, -0.4], [0.45, 2.5, -0.5], 0.025, dk, mt); M(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff4d6d }), 0.45, 2.5, -0.5, mt);
+      mt.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     }
-    // バイク
+    // 自転車（ayu）
     const bike = new THREE.Group(); root.add(bike); bike.visible = false;
-    { const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.1, 8, 16), black); for (const z of [-0.6, 0.65]) { const w = wheel.clone(); w.rotation.y = Math.PI / 2; w.position.set(0, 0.3, z); bike.add(w); }
-      const fr = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.2), std(0xef4444, { m: 0.4, r: 0.3 })); fr.position.y = 0.55; bike.add(fr);
-      const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.7, 6), std(0x9ca3af, { m: 0.8 })); hb.rotation.z = Math.PI / 2; hb.position.set(0, 1.0, 0.55); bike.add(hb); }
-    // ゲーミングチェア
+    {
+      const fr = std(0xf97316, { m: 0.45, r: 0.3 }), tire = toon(0x15121f), mtl = std(0xd1d5db, { m: 0.9, r: 0.2 });
+      for (const z of [-0.62, 0.66]) {
+        const w = new THREE.Group(); w.position.set(0, 0.34, z); bike.add(w);
+        const t = M(new THREE.TorusGeometry(0.31, 0.05, 8, 26), tire, 0, 0, 0, w); t.rotation.y = Math.PI / 2;
+        const rim = M(new THREE.TorusGeometry(0.27, 0.018, 6, 24), mtl, 0, 0, 0, w); rim.rotation.y = Math.PI / 2;
+        for (let i = 0; i < 6; i++) { const sp = M(new THREE.BoxGeometry(0.01, 0.54, 0.012), mtl, 0, 0, 0, w); sp.rotation.x = (i / 6) * Math.PI; }
+        const hub = M(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 10), mtl, 0, 0, 0, w); hub.rotation.z = Math.PI / 2;
+        w.userData.wheel = true;
+      }
+      const P = { rear: [0, 0.34, -0.62], front: [0, 0.34, 0.66], crank: [0, 0.32, -0.02], seat: [0, 0.82, -0.25], head: [0, 0.9, 0.5] };
+      rod(P.rear, P.crank, 0.03, fr, bike); rod(P.rear, P.seat, 0.03, fr, bike); rod(P.crank, P.seat, 0.035, fr, bike);
+      rod(P.seat, P.head, 0.035, fr, bike); rod(P.crank, P.head, 0.04, fr, bike); rod(P.head, P.front, 0.03, mtl, bike);
+      const sd = M(new THREE.BoxGeometry(0.16, 0.06, 0.3), toon(0x15121f), 0, 0.88, -0.27, bike); ol(sd, 1.1);
+      rod([0, 0.9, 0.5], [0, 1.08, 0.48], 0.025, mtl, bike);
+      rod([-0.3, 1.08, 0.45], [0.3, 1.08, 0.45], 0.022, mtl, bike);
+      for (const s of [-1, 1]) M(new THREE.CylinderGeometry(0.035, 0.035, 0.12, 8), toon(0x15121f), 0.3 * s, 1.08, 0.45, bike).rotation.z = Math.PI / 2;
+      M(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 14), mtl, 0.06, 0.32, -0.02, bike).rotation.z = Math.PI / 2;
+      for (const s of [-1, 1]) M(new THREE.BoxGeometry(0.12, 0.03, 0.08), toon(0x15121f), 0.14 * s, 0.32 + 0.12 * s, -0.02 + 0.06 * s, bike);
+      M(new THREE.CircleGeometry(0.05, 10), new THREE.MeshBasicMaterial({ color: 0xfff7c2 }), 0, 0.98, 0.56, bike);
+      bike.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    }
+    // ゲーミングチェア（乗り物）
     const chair = new THREE.Group(); root.add(chair); chair.visible = false;
-    { const r = std(0xef4444), k = std(0x111111); const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.15, 0.8), k); seat.position.y = 0.45; chair.add(seat);
-      const back = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.1, 0.15), r); back.position.set(0, 1.0, -0.4); chair.add(back);
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 6), k); post.position.y = 0.2; chair.add(post); }
+    buildChairModel(chair, 1);
     // キャシー塚本（身代わり）
     const cathy = new THREE.Group(); root.add(cathy); cathy.visible = false;
-    { const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.4, 6, 12), std(0xfda4af, { r: 0.4, e: 0x4c0519 })); b.position.y = 0.5; cathy.add(b);
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), std(0x111111)); for (const s of [-1, 1]) { const ee = e.clone(); ee.position.set(0.1 * s, 0.7, 0.24); cathy.add(ee); }
+    { const b = M(new THREE.CapsuleGeometry(0.28, 0.4, 6, 14), toon(0xfda4af, { e: 0x4c0519 }), 0, 0.5, 0, cathy); ol(b, 1.07);
+      for (const s of [-1, 1]) { M(new THREE.SphereGeometry(0.06, 8, 6), toon(0x15121f), 0.1 * s, 0.68, 0.25, cathy); M(new THREE.CircleGeometry(0.04, 10), new THREE.MeshBasicMaterial({ color: 0xff6b8b, transparent: true, opacity: 0.6 }), 0.17 * s, 0.6, 0.27, cathy); }
       cathy.position.set(-1.0, 0, -0.6); }
     // ムキムキのG
     const gbug = new THREE.Group(); root.add(gbug); gbug.visible = false;
-    { const b = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10), std(0x5b3417, { r: 0.2, m: 0.3 })); b.scale.set(1, 0.5, 1.5); gbug.add(b);
-      for (let i = 0; i < 6; i++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.9, 5), std(0x3b2010)); l.position.set((i % 2 ? 1 : -1) * 0.6, -0.2, (Math.floor(i / 2) - 1) * 0.5); l.rotation.z = (i % 2 ? 1 : -1) * 0.9; gbug.add(l); }
+    { const b = M(new THREE.SphereGeometry(0.6, 14, 10), std(0x5b3417, { r: 0.2, m: 0.3 }), 0, 0, 0, gbug); b.scale.set(1, 0.5, 1.5);
+      for (let i = 0; i < 6; i++) { const l = M(new THREE.CylinderGeometry(0.06, 0.06, 0.9, 5), std(0x3b2010), (i % 2 ? 1 : -1) * 0.6, -0.2, (Math.floor(i / 2) - 1) * 0.5, gbug); l.rotation.z = (i % 2 ? 1 : -1) * 0.9; }
+      for (const s of [-1, 1]) rod([0.15 * s, 0.1, 0.8], [0.5 * s, 0.4, 1.6], 0.02, std(0x3b2010), gbug);
       gbug.position.y = 2.2; }
     // 持ちアイテム
     const hold = new THREE.Group(); arms[1].f.add(hold);
     // チャージ光
     const glow = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffdd55, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
     arms[1].f.add(glow);
-    // 影の丸
     // 名札
     const tag = makeTag();
     tag.position.y = 2.45; root.add(tag);
     if (OPT.tagScale) { tag.scale.multiplyScalar(OPT.tagScale); tag.position.y = 2.6; }
     scene.add(root);
-    return { root, inner, body, bodyMat, arms, legs, eyes, mouth, stars, mt, bike, chair, cathy, gbug, hold, holdType: null, glow, tag, tagStr: '', squash: 1, lastGr: 1, walk: 0, alpha: 1, ko: 0, key };
+    let hsh = 0; for (const c of key) hsh = (hsh * 31 + c.charCodeAt(0)) % 997;
+    return { root, inner, body, bodyMat, arms, legs, eyes, brows, mouth, mouthO, scythe, stars, mt, bike, chair, cathy, gbug, hold, holdType: null, glow, tag, tagStr: '', squash: 1, lastGr: 1, walk: 0, alpha: 1, ko: 0, key, blinkOff: hsh / 997 * 4 };
+  }
+  // ゲーミングチェア（乗り物と持ちアイテムで共用）
+  function buildChairModel(g, k) {
+    const red = toon(0xef4444), blk = toon(0x1c1a24), wht = toon(0xf5f5f4), mtl = std(0x9ca3af, { m: 0.85, r: 0.25 });
+    const seat = M(new THREE.BoxGeometry(0.82, 0.14, 0.8), blk, 0, 0.47, 0, g); ol(seat, 1.04);
+    for (const s of [-1, 1]) { const w = M(new THREE.BoxGeometry(0.1, 0.16, 0.78), red, 0.38 * s, 0.54, 0, g); ol(w, 1.06); }
+    const back = M(new THREE.BoxGeometry(0.72, 1.15, 0.14), blk, 0, 1.08, -0.4, g); back.rotation.x = -0.12; ol(back, 1.03);
+    for (const s of [-1, 1]) { const w = M(new THREE.BoxGeometry(0.14, 1.1, 0.18), red, 0.36 * s, 1.08, -0.37, g); w.rotation.set(-0.12, 0.3 * s, 0); ol(w, 1.05); }
+    M(new THREE.BoxGeometry(0.1, 1.0, 0.02), wht, 0, 1.08, -0.32, g).rotation.x = -0.12;
+    const pil = M(new THREE.BoxGeometry(0.42, 0.18, 0.12), red, 0, 1.52, -0.38, g); pil.rotation.x = -0.12;
+    for (const s of [-1, 1]) { M(new THREE.BoxGeometry(0.08, 0.04, 0.4), blk, 0.47 * s, 0.75, 0.02, g); rod([0.47 * s, 0.5, 0.02], [0.47 * s, 0.74, 0.02], 0.025, blk, g); }
+    M(new THREE.CylinderGeometry(0.05, 0.06, 0.34, 10), mtl, 0, 0.24, 0, g);
+    for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; rod([0, 0.08, 0], [Math.sin(a) * 0.38, 0.05, Math.cos(a) * 0.38], 0.03, blk, g); M(new THREE.SphereGeometry(0.05, 8, 6), blk, Math.sin(a) * 0.38, 0.04, Math.cos(a) * 0.38, g); }
+    g.scale.setScalar(k);
+    g.traverse((o) => { if (o.isMesh && o.material !== outlineMat) o.castShadow = true; });
+    return g;
   }
   function makeTag() {
     const c = document.createElement('canvas'); c.width = 512; c.height = 160;
@@ -283,21 +428,112 @@ window.Render = (function () {
   }
 
   // ---------- 持ち物メッシュ ----------
+  // 向き：銃口が +z、上が +y、握る場所が原点の近く
   function itemMesh(type) {
     const g = new THREE.Group();
     const I = ITEMS[type];
-    const m = std(I.color, { m: 0.4, r: 0.35 });
-    if (type === 'ar') { const b = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.8), m); g.add(b); const mg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.1), m); mg.position.set(0, -0.18, 0.1); g.add(mg); }
-    else if (type === 'sr') { const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 1.2), m); g.add(b); const sc = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 8), std(0x111111)); sc.rotation.x = Math.PI / 2; sc.position.y = 0.13; g.add(sc); }
-    else if (type === 'sg') { const b = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.85), m); g.add(b); const st = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.3), std(0x92400e)); st.position.z = -0.45; g.add(st); }
-    else if (type === 'monitor') { const s = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.48, 0.06), m); g.add(s); const sc = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.4), new THREE.MeshBasicMaterial({ color: 0x38bdf8 })); sc.position.z = 0.035; g.add(sc); }
-    else if (type === 'lan') { const t = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.04, 6, 16), m); g.add(t); }
-    else if (type === 'chair') { const s = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.1), std(0xef4444)); g.add(s); const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 0.4), std(0x111111)); b.position.set(0, -0.25, 0.2); g.add(b); }
-    else if (type === 'energy') { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.32, 12), m); g.add(c); }
-    else if (type === 'goreisan') { const b = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.08), m); g.add(b); }
-    else if (type === 'detox') { const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.36, 0.04), m); g.add(p); }
-    else { const u = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.36), std(I.color, { e: I.color, m: 0.2 })); g.add(u); }
-    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    const gun = std(0x2b2f38, { m: 0.7, r: 0.35 }), gun2 = std(0x3f4552, { m: 0.6, r: 0.4 }), steel = std(0xb6bcc6, { m: 0.9, r: 0.22 });
+    const wood = std(0x8a4b22, { r: 0.6 }), wood2 = std(0x6b3a1a, { r: 0.65 });
+    const B = (w, h, d, m, x, y, z) => M(new THREE.BoxGeometry(w, h, d), m, x, y, z, g);
+    const Cz = (r1, r2, L, m, x, y, z, seg = 12) => { const c = M(new THREE.CylinderGeometry(r1, r2, L, seg), m, x, y, z, g); c.rotation.x = Math.PI / 2; return c; };
+    const glowM = (c) => new THREE.MeshBasicMaterial({ color: c });
+    if (type === 'ar') {
+      const tan = std(0xc8a46a, { r: 0.6 });
+      B(0.12, 0.15, 0.46, gun, 0, 0.07, 0.1); ol(g.children[0], 1.05);
+      B(0.1, 0.12, 0.32, tan, 0, 0.07, 0.47);
+      for (let i = 0; i < 4; i++) B(0.104, 0.03, 0.04, gun2, 0, 0.1, 0.36 + i * 0.07);
+      Cz(0.024, 0.024, 0.36, gun2, 0, 0.08, 0.76); Cz(0.04, 0.035, 0.08, steel, 0, 0.08, 0.96);
+      B(0.03, 0.02, 0.6, gun2, 0, 0.155, 0.3); // レール
+      const mag = B(0.07, 0.24, 0.11, tan, 0, -0.1, 0.2); mag.rotation.x = 0.3; ol(mag, 1.06);
+      const gr = B(0.065, 0.17, 0.08, gun, 0, -0.07, -0.02); gr.rotation.x = -0.35;
+      B(0.07, 0.13, 0.3, tan, 0, 0.04, -0.3); B(0.08, 0.16, 0.05, gun, 0, 0.02, -0.46);
+      B(0.06, 0.07, 0.12, gun, 0, 0.2, 0.1); M(new THREE.CircleGeometry(0.022, 10), glowM(0xff3355), 0, 0.2, 0.161, g);
+    } else if (type === 'sr') {
+      const cam = std(0x4d5b3a, { r: 0.55 });
+      B(0.1, 0.13, 0.5, gun, 0, 0.06, 0.12); ol(g.children[0], 1.05);
+      Cz(0.022, 0.026, 0.9, gun2, 0, 0.07, 0.8); Cz(0.04, 0.04, 0.12, steel, 0, 0.07, 1.27);
+      B(0.09, 0.11, 0.42, cam, 0, 0.05, 0.5);
+      const sc = Cz(0.05, 0.05, 0.42, gun, 0, 0.2, 0.15, 14); ol(sc, 1.08);
+      Cz(0.065, 0.055, 0.08, gun, 0, 0.2, 0.38, 14); Cz(0.06, 0.05, 0.07, gun, 0, 0.2, -0.08, 14);
+      M(new THREE.CircleGeometry(0.05, 14), glowM(0x5eead4), 0, 0.2, 0.421, g); M(new THREE.CircleGeometry(0.045, 14), glowM(0x2dd4bf), 0, 0.2, -0.116, g).rotation.y = Math.PI;
+      for (const z of [0.07, 0.24]) B(0.03, 0.08, 0.03, gun2, 0, 0.14, z);
+      const bolt = M(new THREE.CylinderGeometry(0.012, 0.012, 0.12, 6), steel, 0.08, 0.08, 0.02, g); bolt.rotation.z = Math.PI / 2; M(new THREE.SphereGeometry(0.028, 8, 6), steel, 0.14, 0.08, 0.02, g);
+      const st = B(0.08, 0.16, 0.42, cam, 0, 0.02, -0.33); ol(st, 1.05); B(0.07, 0.06, 0.2, cam, 0, 0.12, -0.3);
+      const gr = B(0.06, 0.15, 0.07, gun, 0, -0.07, -0.05); gr.rotation.x = -0.4;
+      for (const s of [-1, 1]) { const bp = M(new THREE.CylinderGeometry(0.01, 0.01, 0.34, 6), gun2, 0.03 * s, 0.02, 0.88, g); bp.rotation.set(Math.PI / 2 - 0.08, 0, 0.05 * s); }
+    } else if (type === 'sg') {
+      B(0.13, 0.15, 0.32, gun, 0, 0.06, 0.08); ol(g.children[0], 1.05);
+      Cz(0.036, 0.036, 0.62, gun2, 0, 0.09, 0.55); Cz(0.028, 0.028, 0.5, gun2, 0, 0.02, 0.48);
+      Cz(0.045, 0.04, 0.05, steel, 0, 0.09, 0.87);
+      const pump = B(0.1, 0.09, 0.24, wood, 0, 0.02, 0.42); ol(pump, 1.06);
+      for (let i = 0; i < 4; i++) B(0.104, 0.093, 0.012, wood2, 0, 0.02, 0.33 + i * 0.06);
+      const gr = B(0.07, 0.15, 0.08, wood, 0, -0.06, -0.08); gr.rotation.x = -0.45;
+      const st = B(0.09, 0.15, 0.36, wood, 0, 0.0, -0.32); st.rotation.x = 0.12; ol(st, 1.05);
+      B(0.095, 0.17, 0.04, std(0x1c1a24), 0, -0.02, -0.5);
+      for (let i = 0; i < 3; i++) Cz(0.016, 0.016, 0.05, std(0xdc2626), 0.07, 0.04, 0.0 + i * 0.05, 8);
+    } else if (type === 'monitor') {
+      const bez = B(0.82, 0.5, 0.05, std(0x111318, { r: 0.4, m: 0.3 }), 0, 0, 0); ol(bez, 1.04);
+      const tex = labelTex('monitor', 256, 160, (c, w, h) => {
+        const gr = c.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#1e1b4b'); gr.addColorStop(1, '#0e7490'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+        c.strokeStyle = '#22d3ee'; c.lineWidth = 4; c.beginPath(); for (let x = 0; x <= w; x += 16) c.lineTo(x, 110 - Math.sin(x * 0.05) * 30 - x * 0.15); c.stroke();
+        c.fillStyle = '#fde047'; c.font = 'bold 28px sans-serif'; c.fillText('FPS 240', 14, 34);
+        c.fillStyle = '#f472b6'; c.fillRect(14, 132, 140, 12); c.fillStyle = '#4ade80'; c.fillRect(14, 132, 92, 12);
+      });
+      M(new THREE.PlaneGeometry(0.75, 0.43), new THREE.MeshBasicMaterial({ map: tex }), 0, 0.01, 0.027, g);
+      B(0.42, 0.3, 0.1, std(0x1c1f26, { r: 0.5 }), 0, 0, -0.07);
+      B(0.7, 0.02, 0.02, glowM(0xf472b6), 0, -0.24, -0.03);
+      B(0.07, 0.26, 0.05, steel, 0, -0.34, -0.1); const base = B(0.36, 0.03, 0.22, std(0x1c1f26), 0, -0.47, -0.06); ol(base, 1.06);
+    } else if (type === 'lan') {
+      const curve = new (class extends THREE.Curve { getPoint(t) { const a = t * Math.PI * 2 * 3.2; return new THREE.Vector3(Math.cos(a) * 0.16, Math.sin(a) * 0.16, (t - 0.5) * 0.36); } })();
+      const tube = M(new THREE.TubeGeometry(curve, 120, 0.026, 6, false), std(0x3b82f6, { r: 0.45 }), 0, 0, 0, g); ol(tube, 1.06);
+      for (const s of [-1, 1]) {
+        const end = new THREE.Group(); end.position.copy(curve.getPoint(s < 0 ? 0 : 1)); end.position.z += 0.06 * s; g.add(end);
+        M(new THREE.BoxGeometry(0.07, 0.05, 0.11), new THREE.MeshStandardMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.6, roughness: 0.1 }), 0, 0, 0, end);
+        M(new THREE.BoxGeometry(0.05, 0.012, 0.06), std(0xfbbf24, { m: 0.9, r: 0.2 }), 0, 0.015, 0.02 * s, end);
+        M(new THREE.BoxGeometry(0.03, 0.02, 0.05), std(0x3b82f6), 0, 0.035, -0.01 * s, end);
+      }
+    } else if (type === 'chair') {
+      const c = new THREE.Group(); buildChairModel(c, 0.42); c.position.set(0, -0.35, -0.05); g.add(c);
+    } else if (type === 'energy') {
+      const tex = labelTex('energy', 256, 128, (c, w, h) => {
+        c.fillStyle = '#111827'; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#a3e635'; c.beginPath(); c.moveTo(70, 8); c.lineTo(40, 70); c.lineTo(66, 70); c.lineTo(48, 122); c.lineTo(100, 50); c.lineTo(72, 50); c.lineTo(92, 8); c.fill();
+        c.fillStyle = '#a3e635'; c.font = 'bold 30px sans-serif'; c.fillText('ENERGY', 112, 62); c.fillStyle = '#fff'; c.font = 'bold 18px sans-serif'; c.fillText('MAX POWER', 116, 92);
+        c.fillStyle = '#a3e635'; c.fillRect(0, 0, w, 6); c.fillRect(0, h - 6, w, 6);
+      });
+      tex.wrapS = THREE.RepeatWrapping;
+      const can = M(new THREE.CylinderGeometry(0.1, 0.1, 0.3, 24, 1, true), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.3, metalness: 0.5 }), 0, 0, 0, g); ol(can, 1.05);
+      M(new THREE.CylinderGeometry(0.085, 0.1, 0.03, 24), steel, 0, 0.165, 0, g); M(new THREE.CylinderGeometry(0.1, 0.085, 0.03, 24), steel, 0, -0.165, 0, g);
+      M(new THREE.BoxGeometry(0.04, 0.008, 0.06), steel, 0, 0.183, 0.02, g);
+    } else if (type === 'goreisan') {
+      const tex = labelTex('goreisan', 256, 170, (c, w, h) => {
+        c.fillStyle = '#fefce8'; c.fillRect(0, 0, w, h); c.fillStyle = '#15803d'; c.fillRect(0, 0, w, 44); c.fillRect(0, h - 22, w, 22);
+        c.fillStyle = '#fff'; c.font = 'bold 26px sans-serif'; c.fillText('漢方薬', 12, 32);
+        c.fillStyle = '#14532d'; c.font = 'bold 64px serif'; c.fillText('五苓散', 30, 124);
+        c.strokeStyle = '#dc2626'; c.lineWidth = 5; c.strokeRect(196, 52, 46, 46); c.fillStyle = '#dc2626'; c.font = 'bold 24px sans-serif'; c.fillText('第2類', 194, 84);
+      });
+      const box = M(new THREE.BoxGeometry(0.32, 0.22, 0.1), [toon(0x15803d), toon(0x15803d), toon(0xfefce8), toon(0xfefce8), new THREE.MeshBasicMaterial({ map: tex }), new THREE.MeshBasicMaterial({ map: tex })], 0, 0, 0, g); ol(box, 1.05);
+      const sa = M(new THREE.BoxGeometry(0.12, 0.16, 0.01), std(0xe5e7eb, { m: 0.6, r: 0.3 }), 0.06, 0.13, 0.02, g); sa.rotation.z = -0.25;
+    } else if (type === 'detox') {
+      const tex = labelTex('detox', 128, 240, (c, w, h) => {
+        const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#bbf7d0'); gr.addColorStop(1, '#22c55e'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#15803d'; c.beginPath(); c.ellipse(64, 100, 28, 46, 0.5, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#bbf7d0'; c.lineWidth = 4; c.beginPath(); c.moveTo(44, 138); c.lineTo(82, 64); c.stroke();
+        c.fillStyle = '#14532d'; c.font = 'bold 34px sans-serif'; c.textAlign = 'center'; c.fillText('OFF', 64, 196);
+      });
+      const ph = B(0.21, 0.4, 0.03, std(0x1c1a24, { r: 0.3, m: 0.4 }), 0, 0, 0); ol(ph, 1.05);
+      M(new THREE.PlaneGeometry(0.19, 0.36), new THREE.MeshBasicMaterial({ map: tex }), 0, 0, 0.0155, g);
+      const leaf = M(new THREE.SphereGeometry(0.08, 10, 8), toon(0x4ade80), 0.11, 0.2, 0.03, g); leaf.scale.set(0.5, 1, 0.2); leaf.rotation.z = -0.6;
+    } else if (type === 'sst' || type === 'sst2') {
+      const col = type === 'sst2' ? 0xff3b6b : 0x22d3ee;
+      const glass = new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2, emissive: col, emissiveIntensity: 0.25 });
+      const core = M(new THREE.CylinderGeometry(0.035, 0.035, 0.34, 10), glowM(col), 0, 0, 0, g); core.rotation.x = Math.PI / 2;
+      Cz(0.08, 0.08, 0.34, glass, 0, 0, 0, 16);
+      for (const z of [-0.2, 0.2]) { Cz(0.09, 0.09, 0.06, steel, 0, 0, z, 16); }
+      for (const z of [-0.08, 0.08]) { const r = M(new THREE.TorusGeometry(0.085, 0.012, 6, 18), std(0x1c1a24), 0, 0, z, g); }
+      Cz(0.03, 0.01, 0.1, steel, 0, 0, 0.28, 8);
+      if (type === 'sst2') for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const sp = M(new THREE.ConeGeometry(0.025, 0.09, 6), std(0x1c1a24, { m: 0.6 }), Math.cos(a) * 0.1, Math.sin(a) * 0.1, 0, g); sp.rotation.z = a - Math.PI / 2; }
+    } else { const u = B(0.16, 0.06, 0.36, std(I.color, { e: I.color, m: 0.2 }), 0, 0, 0); ol(u, 1.08); }
+    g.traverse((o) => { if (o.isMesh && o.material !== outlineMat) o.castShadow = true; });
     return g;
   }
   function groundItem(type) {
@@ -721,9 +957,38 @@ window.Render = (function () {
     if (p.sn > 0) { ch.stars.rotation.y += dt * 5; ch.stars.children.forEach((st, k) => { const a = (k / 3) * Math.PI * 2; st.position.set(Math.cos(a) * 0.5, Math.sin(now * 4 + k) * 0.08, Math.sin(a) * 0.5); }); }
     // チャージ光
     ch.glow.material.opacity = p.ch > 0.35 ? Math.min(0.9, (p.ch - 0.35) * 1.5) * (0.7 + Math.sin(now * 30) * 0.3) : (p.sr > 0.6 ? 0.8 : 0);
-    // 目（気絶・状態異常）
-    const eyeS = p.sn > 0 || p.gby ? 0.2 : has('majigire') ? 0.55 : 1;
-    ch.eyes.forEach((e) => { e.scale.y += (eyeS - e.scale.y) * 0.3; });
+    // 目（気絶・状態異常・まばたき）
+    const blink = ((now + ch.blinkOff) % 3.6) < 0.11;
+    const eyeS = p.sn > 0 || p.gby ? 0.2 : has('majigire') ? 0.55 : blink ? 0.12 : 1;
+    ch.eyes.forEach((e) => { e.scale.y += (eyeS - e.scale.y) * (blink ? 0.6 : 0.3); });
+    // 眉と口の表情
+    const angry = has('majigire') || has('kyouki') || p.ch > 0.35 || p.gb;
+    const sad = p.sn > 0 || p.h >= 150 || has('naeochi');
+    ch.brows.forEach((b) => { const tz = (angry ? -0.45 : sad ? 0.4 : 0.12) * b.userData.s; b.rotation.z += (tz - b.rotation.z) * 0.25; b.position.y += ((sad ? 0.5 : angry ? 0.5 : 0.53) - b.position.y) * 0.25; });
+    const open = !!(p.hs || p.sn > 0 || p.gby || (!p.gr && p.vy > 6) || has('takawarai'));
+    ch.mouth.visible = !open; ch.mouthO.visible = open;
+    if (open) ch.mouthO.scale.y = 1.15 + Math.sin(now * 18) * (has('takawarai') ? 0.3 : 0.08);
+    // 自転車の車輪
+    if (bf.bike) ch.bike.children.forEach((w) => { if (w.userData.wheel) w.rotation.x += spd * dt * 3.2; });
+    // にもの大鎌：大鎌ダッシュ中は手に持って振り抜く
+    if (ch.scythe) {
+      const sc = ch.scythe, rest = sc.userData.rest;
+      if (p.sy && !(ch.syLeft > 0)) ch.syLeft = 0.7;
+      if (ch.syLeft > 0) {
+        ch.syLeft -= dt;
+        if (sc.parent !== ch.inner) { ch.inner.add(sc); ch.syT = 0; }
+        ch.syT = (ch.syT || 0) + dt;
+        const k = Math.min(1, ch.syT / 0.45);
+        sc.position.set(0.55, 1.0, 0.35); sc.rotation.set(-0.3, 0, 1.4 - k * 3.0);
+        sc.userData.gem.material.emissive.setHex(0xff2244);
+        if (k < 1) {
+          const v = new THREE.Vector3(1.25, 0.6, 0); sc.localToWorld(v);
+          const m = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2a4a, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+          m.position.copy(v); addFx(m, 0.35, (f, kk) => { m.material.opacity = kk * 0.7; m.scale.setScalar(0.5 + kk); });
+        }
+      } else if (sc.parent !== rest.parent) { rest.parent.add(sc); sc.position.copy(rest.p); sc.rotation.copy(rest.r); sc.userData.gem.material.emissive.setHex(0xaa0022); }
+      else sc.userData.gem.material.emissive.setHex(0xaa0022 + (Math.sin(now * 3) > 0 ? 0x110000 : 0));
+    }
     // 色の演出
     const emi = ch.bodyMat.emissive;
     if (has('majigire')) emi.setRGB(0.35 + Math.sin(now * 10) * 0.15, 0, 0);
@@ -809,5 +1074,5 @@ window.Render = (function () {
       ch.tag.visible = false; chars.set(-1 - i, ch);
     });
   }
-  return { init, update, thumbnails, mapPreview, applySettings, setHideTags: (v) => (hideTags = v), setMyId, clear, idle, project, previewChar, cam, get camera() { return camera; }, get scene() { return scene; }, get mars() { return marsObj; } };
+  return { _render: () => renderer.render(scene, camera), _buildChar: (k) => buildChar(k), _itemMesh: (t) => itemMesh(t), init, update, thumbnails, mapPreview, applySettings, setHideTags: (v) => (hideTags = v), setMyId, clear, idle, project, previewChar, cam, get camera() { return camera; }, get scene() { return scene; }, get mars() { return marsObj; } };
 })();

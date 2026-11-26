@@ -1145,7 +1145,7 @@ window.Sim = (function () {
           h: Math.round(p.hero), l: p.lives, tp: p.tp, k: p.kills, tk: p.ticket, tkp: p.ticketProg,
           e: p.elim ? 1 : 0, rs: p.respawn > 0 ? r2(p.respawn) : 0, inv: p.inv > 0 ? 1 : 0, mi: p.minion ? 1 : 0, bot: p.bot ? 1 : 0,
           gr: p.ground ? 1 : 0, pt: r2(p.punchT), ps: p.punchSide, ch: r2(p.charging), hd: r2(p.headT), gb: p.grab || 0, gby: p.grabbedBy || 0,
-          ld: p.ledge ? 1 : 0, sn: r2(p.stun), hs: p.hitstun > 0 ? 1 : 0, gd: p.guard ? 1 : 0, ds: p.dashT > 0 ? 1 : 0, cr: p.crouchT > 0 ? 1 : 0,
+          ld: p.ledge ? 1 : 0, sn: r2(p.stun), hs: p.hitstun > 0 ? 1 : 0, gd: p.guard ? 1 : 0, ds: p.dashT > 0 ? 1 : 0, sy: p.scy > 0 ? 1 : 0, cr: p.crouchT > 0 ? 1 : 0,
           st: Object.keys(p.st).map((k) => [k, r2(p.st[k].t), p.st[k].lv, p.st[k].dis || '']),
           bf: Object.keys(p.buffs).filter((k) => typeof p.buffs[k] === 'number' || k === 'ken').map((k) => [k, r2(typeof p.buffs[k] === 'number' ? p.buffs[k] : p.buffs[k].t), k === 'ken' ? p.buffs.ken.k : 0]),
           it: p.item || '', am: p.ammo, sr: r2(p.srT), sp: r2(p.spCD), ca: p.cathy ? p.cathy.n : 0, ct: p.ctrl ? 1 : 0, cb: p.ctrlBy ? 1 : 0,
