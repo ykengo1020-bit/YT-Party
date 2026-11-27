@@ -212,7 +212,7 @@ window.Render = (function () {
   const SKY_DEF = { top: 0x3b2a7a, mid: 0xf08a6a, bot: 0x2a3d6b };
   function applyMap(mp) {
     if (curMap === mp) return; curMap = mp;
-    if (decoGroup) { scene.remove(decoGroup); decoGroup = null; }
+    if (decoGroup) { scene.remove(decoGroup); freeObj(decoGroup); decoGroup = null; }
     coverIdx = new Map();
     const Mp = GD.MAPS[mp], st = Mp && Mp.style;
     const sky = scene.getObjectByName('sky');
@@ -251,7 +251,9 @@ window.Render = (function () {
   })();
   function toon(color, o = {}) { return new THREE.MeshToonMaterial({ color: new THREE.Color(color).convertSRGBToLinear(), gradientMap: toonGrad, emissive: o.e ?? 0x000000, transparent: !!o.t, opacity: o.t ?? 1 }); }
   // 縁取り（裏返した少し大きいメッシュ）
-  function ol(mesh, k = 1.07) { const o = new THREE.Mesh(mesh.geometry, outlineMat); o.scale.setScalar(k); o.raycast = () => {}; mesh.add(o); return mesh; }
+  // スマホでは細かい部品の縁取りを省いて軽くする
+  function ol(mesh, k = 1.07) { if (k > 1.065 && window.Settings && Settings.isMobile && Settings.isMobile()) return mesh;
+    const o = new THREE.Mesh(mesh.geometry, outlineMat); o.scale.setScalar(k); o.raycast = () => {}; mesh.add(o); return mesh; }
   function M(geo, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (parent) parent.add(m); return m; }
   // 2点を結ぶ円柱（フレームや脚に使う）
   function rod(a, b, r, mat, parent, seg = 8) {
@@ -705,6 +707,8 @@ window.Render = (function () {
       (Array.isArray(m) ? m : [m]).forEach((mm) => { if (mm.map && mm.map !== flashTex && mm.map !== circleTex) mm.map.dispose(); mm.dispose(); });
     });
   }
+  // 使わなくなったメッシュのメモリを解放（テクスチャは使い回すので残す）
+  function freeObj(o) { if (!o) return; o.traverse((c) => { if (c.geometry) c.geometry.dispose(); const m = c.material; if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { if (mm !== outlineMat) mm.dispose(); }); }); }
   function addFx(o, life, upd) { fxList.push({ o, life, max: life, upd }); scene.add(o); }
   function spark(x, y, z, p, col) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, color: col || 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
@@ -1038,7 +1042,7 @@ window.Render = (function () {
     const warn = new THREE.Mesh(new THREE.CircleGeometry(1.8, 24), new THREE.MeshBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.4 }));
     warn.rotation.x = -Math.PI / 2; warn.position.set(x, 0.05, z); scene.add(warn);
     m.position.set(x + 8, 30, z - 8);
-    addFx(m, 1.2, (f, k) => { const t = 1 - k; m.position.set(x + 8 * (1 - t), 30 * (1 - t) + 0.5, z - 8 * (1 - t)); m.rotation.x += 0.2; warn.material.opacity = 0.2 + 0.4 * Math.abs(Math.sin(t * 20)); if (k <= 0.02) scene.remove(warn); });
+    addFx(m, 1.2, (f, k) => { const t = 1 - k; m.position.set(x + 8 * (1 - t), 30 * (1 - t) + 0.5, z - 8 * (1 - t)); m.rotation.x += 0.2; warn.material.opacity = 0.2 + 0.4 * Math.abs(Math.sin(t * 20)); if (k <= 0.02) { scene.remove(warn); freeObj(warn); } });
   }
   function floatText(x, y, z, s, col, big) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 96;
@@ -1215,7 +1219,7 @@ window.Render = (function () {
       if (!m) { m = groundItem(it[1]); itemMeshes.set(it[0], m); }
       m.position.set(it[2], it[3] + Math.sin(now * 3 + it[0]) * 0.12, it[4]); m.userData.m.rotation.y += dt * 2;
     });
-    for (const [id, m] of itemMeshes) if (!seen.has(id)) { scene.remove(m); itemMeshes.delete(id); }
+    for (const [id, m] of itemMeshes) if (!seen.has(id)) { scene.remove(m); freeObj(m); itemMeshes.delete(id); }
     const seenP = new Set();
     s.pr.forEach((p) => {
       seenP.add(p[0]);
@@ -1223,7 +1227,7 @@ window.Render = (function () {
       if (!m) { m = itemMesh(p[1]); scene.add(m); projMeshes.set(p[0], m); }
       m.position.set(p[2], p[3], p[4]); m.rotation.x += dt * 12;
     });
-    for (const [id, m] of projMeshes) if (!seenP.has(id)) { scene.remove(m); projMeshes.delete(id); }
+    for (const [id, m] of projMeshes) if (!seenP.has(id)) { scene.remove(m); freeObj(m); projMeshes.delete(id); }
 
     // キャラクター
     const seenC = new Set();
@@ -1233,7 +1237,7 @@ window.Render = (function () {
       if (!ch) { ch = buildChar(p.c); chars.set(p.id, ch); }
       animChar(ch, p, dt, now, s);
     }
-    for (const [id, ch] of chars) if (!seenC.has(id)) { scene.remove(ch.root); chars.delete(id); }
+    for (const [id, ch] of chars) if (!seenC.has(id)) { scene.remove(ch.root); freeObj(ch.root); chars.delete(id); }
 
     // Mars
     if (s.m) {
@@ -1482,7 +1486,7 @@ window.Render = (function () {
     } else if (ch.tring) { ch.root.remove(ch.tring); ch.tring = null; }
     // 持ち物
     if (ch.holdType !== p.it) {
-      ch.hold.clear(); ch.holdType = p.it;
+      ch.hold.children.slice().forEach((c) => { ch.hold.remove(c); freeObj(c); }); ch.holdType = p.it;
       if (p.it) { const m = itemMesh(p.it); m.rotation.x = Math.PI / 2; m.position.y = -0.1; ch.hold.add(m); }
     }
     // 名札
@@ -1521,13 +1525,13 @@ window.Render = (function () {
   }
   function setMyId(id) { myId = id; }
   function clear() {
-    for (const [, ch] of chars) scene.remove(ch.root); chars.clear();
-    for (const [, m] of itemMeshes) scene.remove(m); itemMeshes.clear();
-    for (const [, m] of projMeshes) scene.remove(m); projMeshes.clear();
-    if (marsObj) { scene.remove(marsObj.g); marsObj = null; }
-    fxList.forEach((f) => scene.remove(f.o)); fxList.length = 0;
+    for (const [, ch] of chars) { scene.remove(ch.root); freeObj(ch.root); } chars.clear();
+    for (const [, m] of itemMeshes) { scene.remove(m); freeObj(m); } itemMeshes.clear();
+    for (const [, m] of projMeshes) { scene.remove(m); freeObj(m); } projMeshes.clear();
+    if (marsObj) { scene.remove(marsObj.g); freeObj(marsObj.g); marsObj = null; }
+    fxList.forEach((f) => { scene.remove(f.o); disposeFx(f.o); }); fxList.length = 0;
     tileMeshes.forEach((m) => { m.visible = true; m.userData.gone = false; m.userData.top = undefined; m.rotation.set(0, 0, 0); m.position.y = -0.6; m.scale.y = 1; });
-    curTheme = null; curMap = null; if (decoGroup) { scene.remove(decoGroup); decoGroup = null; } coverIdx = new Map();
+    curTheme = null; curMap = null; if (decoGroup) { scene.remove(decoGroup); freeObj(decoGroup); decoGroup = null; } coverIdx = new Map();
     scene.children.forEach((o) => { if (o.name === 'island') o.visible = true; });
     { const sky = scene.getObjectByName('sky'); if (sky) { sky.material.uniforms.top.value.setHex(SKY_DEF.top); sky.material.uniforms.mid.value.setHex(SKY_DEF.mid); sky.material.uniforms.bot.value.setHex(SKY_DEF.bot); } }
     if (platGroup) platGroup.clear();
@@ -1554,5 +1558,5 @@ window.Render = (function () {
       ch.tag.visible = false; chars.set(-1 - i, ch);
     });
   }
-  return { itemThumbs, _render: () => renderer.render(scene, camera), _buildChar: (k) => buildChar(k), _itemMesh: (t) => itemMesh(t), init, update, thumbnails, mapPreview, applySettings, setHideTags: (v) => (hideTags = v), setMyId, clear, idle, project, previewChar, cam, get camera() { return camera; }, get scene() { return scene; }, get mars() { return marsObj; } };
+  return { _info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geo: renderer.info.memory.geometries, tex: renderer.info.memory.textures }), itemThumbs, _render: () => renderer.render(scene, camera), _buildChar: (k) => buildChar(k), _itemMesh: (t) => itemMesh(t), init, update, thumbnails, mapPreview, applySettings, setHideTags: (v) => (hideTags = v), setMyId, clear, idle, project, previewChar, cam, get camera() { return camera; }, get scene() { return scene; }, get mars() { return marsObj; } };
 })();

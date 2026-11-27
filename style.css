@@ -456,3 +456,58 @@ body.mobile .me .slot { display: none; }
   .rr .rn small { display: none; }
 }
 .rpresets, .rmy { flex: 0 0 auto; }
+/* 手描きアイコン */
+.ico { display: inline-block; vertical-align: -0.28em; margin-right: 4px; flex: 0 0 auto; }
+.h1 .ico { vertical-align: -0.2em; margin-right: 8px; }
+.btn .ico { margin-right: 6px; }
+.rr .ri .ico { margin: 0; }
+#rotate .ph { display: block; margin: 0 auto 10px; }
+.lver { font-size: 11px; background: var(--ink); color: #fff; border-radius: 6px; padding: 0 5px; margin-left: 2px; }
+.mobrow .btn { display: flex; align-items: center; justify-content: center; }
+/* プリセット */
+.rp { position: relative; user-select: none; }
+.rp.on { background: var(--yel); }
+.rp.user { background: #eef2ff; }
+.rp.user.on { background: var(--yel); }
+.rp.add { background: #ecfdf5; border-style: dashed; }
+.rp b { display: flex; align-items: center; gap: 2px; }
+.rpx { position: absolute; top: -10px; right: -8px; display: flex; gap: 2px; }
+.rpb { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.rpb .ico { margin: 0; }
+.rpb:hover { background: #fff8db; }
+.rp[aria-disabled="true"] { opacity: .6; cursor: default; }
+.rpnew { display: flex; gap: 8px; align-items: center; width: 100%; flex-wrap: wrap; background: #ecfdf5; border: 3px solid var(--ink); border-radius: 12px; padding: 8px 10px; }
+.rpnew .txt { flex: 1 1 160px; font-size: 16px; padding: 6px 10px; }
+.rmy .linkb { display: inline-flex; align-items: center; }
+.rpick { font-family: var(--font); font-weight: 800; font-size: 13px; border: 3px solid var(--ink); border-radius: 10px; padding: 5px 6px; background: #fff; max-width: 150px; }
+.rr .ri { width: 44px; height: 44px; border-radius: 12px; background: #fff8ec; border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; }
+.rp.user { padding-right: 66px; }
+.rpx { top: 50%; right: 8px; transform: translateY(-50%); }
+/* 縦長のスマホ（縦向き）でもメニューが崩れないように */
+@media (max-width: 600px) {
+  .screen { align-items: flex-start; overflow: auto; padding: 8px 0; }
+  .screen .panel { width: 96vw !important; padding: 12px; }
+  .h1 { font-size: 22px; }
+  .row { flex-wrap: wrap; }
+  .selwrap { grid-template-columns: 1fr; }
+  .selwrap .grid { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .selwrap .card img { height: 15vw; }
+  .selwrap .card .nm { font-size: 12px; } .selwrap .card .bars { display: none; }
+  .selwrap .detail { max-height: none; }
+  .members { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .mem { font-size: 10px; padding: 3px; } .mem img { height: 44px; }
+  .rulebar { flex-direction: column; align-items: stretch; }
+  .rb-btns { justify-content: space-between; flex-wrap: wrap; }
+  .votegrid { grid-template-columns: repeat(2, 1fr) !important; }
+  .votegrid .card .d { display: none; }
+  .titlebox { width: 94vw; }
+  .logo .l1 { font-size: 46px; }
+  .rr { flex-wrap: wrap; } .rr .rn { flex: 1 1 60%; } .rr .rv { margin-left: auto; }
+  .seg button { padding: 5px 8px; font-size: 13px; }
+}
+/* 大きい画面ではメニューを少し大きく */
+@media (min-width: 1700px) and (min-height: 950px) {
+  .screen .panel, .ov .panel, .titlebox { zoom: 1.18; }
+}
+@media (max-width: 1250px) { .hint { display: none; } }
+.rulebar.slim { margin: 2px 0 8px; padding: 6px 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

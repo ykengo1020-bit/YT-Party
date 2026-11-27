@@ -107,7 +107,7 @@
   const K = (a) => '<kbd>' + Settings.key(a) + '</kbd>';
   const RULES = [
     { v: 'rule_punch', t: '殴ってヘロヘロ値を上げる', x: () => `${K('punch')}でパンチ。当てるたびに相手の<b>ヘロヘロ値（%）</b>が上がります。<b>3連続で当てるとコンボ</b>になり、3発目で大きく吹っ飛ばせます。<br>${K('punch')}を長押しすると<b>溜めパンチ</b>。手が光ったら離すと大きく吹っ飛ばせます。空中で押すとドロップキック。<br>ヘロヘロ値は時間では減らず、<b>100%を超えて999%まで</b>溜まります（落ちると0%に戻る）。` },
-    { v: 'rule_smash', t: 'ヘロヘロ値が高いほど遠くへ吹っ飛ぶ', x: () => `ヘロヘロ値が高い相手ほど、同じ攻撃でも遠くまで飛びます。100%前後の溜めパンチなら中央からでも場外まで飛ぶことも。<br><b>場外に落ちるとライフ-1</b>。ライフ（1〜3、ロビーで選ぶ）が0になると脱落、<b>最後の一人が優勝</b>です。<br>落ちてもライフが残っていれば3秒後に空から復帰します。` },
+    { v: 'rule_smash', t: 'ヘロヘロ値が高いほど遠くへ吹っ飛ぶ', x: () => `ヘロヘロ値が高い相手ほど、同じ攻撃でも遠くまで飛びます。100%前後の溜めパンチなら中央からでも場外まで飛ぶことも。<br><b>場外に落ちるとストック-1</b>。ストックが0になると脱落、<b>最後の一人が優勝</b>です。落ちてもストックが残っていれば3秒後に空から復帰します。<br>ロビーの<b>「ルール」</b>で、ストック数（1〜9機）や<b>タイム制</b>（時間内に落とした数−落ちた数で勝負）、ふっとび率などを変えられます。` },
     { v: 'rule_grab', t: '掴んで、持ち上げて、投げる', x: () => `${K('grab')}を長押しすると目の前の相手を掴みます。<b>0.5秒以上掴むと持ち上げ</b>、ボタンを離すと向いている方向へ投げます。<br>掴んだまま場外のほうへ歩いて行って投げるのが一番の勝ち筋。<br>掴まれた側は ${K('punch')} や ${K('jump')} を連打すると振りほどけます。` },
     { v: 'rule_stun', t: '100%・150%・200%…で気絶', x: () => `ヘロヘロ値が<b>100%・150%・200%…と50%刻みのラインを超えるたびに約1.3秒気絶</b>します（頭の上に星）。<br>気絶した相手は掴んで運び放題。ヘロヘロ値が高いほど、掴まれたときに振りほどくのも大変になります。` },
     { v: 'rule_ledge', t: '二段ジャンプと崖つかまりで復帰', x: () => `空中でもう1回 ${K('jump')} が使えます（<b>二段ジャンプ</b>。宙返りしながら高く跳ぶ）。地面・浮き床・崖につかまると回復します。<br>ステージの端に手が届くと<b>自動で崖につかまり</b>ます。${K('jump')}で登る、${K('dash')}で手を離す。<br>崖につかまっている相手は殴ると手を離します。` },
@@ -117,7 +117,7 @@
     { v: null, t: 'チーム戦', x: () => `ロビーでホストが<b>「チーム戦」</b>を選ぶと、2〜4チームに分かれて戦えます。<br>自分のカードをクリックするとチームが変わります（ホストはCPUも含めて全員を変えられる）。<br>「味方への攻撃：当たらない」なら、味方にはパンチ・掴み・スキルが当たりません。「当たる」にすると巻き込み注意。<br><b>相手チームを全員脱落させたチームの勝ち</b>。足元の輪と名前の色が自分のチームの色です。` },
     { v: null, t: 'TP・スキル・交換券', x: () => `<b>TPは5秒ごとに1ずつ</b>自動で貯まります（最大30）。相手を落とすと+2、投げると+1。<br>${K('s1')}〜${K('s4')}でキャラごとのスキル（TPを消費）、${K('v')}でキャラ固有アクション。<br>スキルの中身はキャラ選択画面で<b>動画つきで確認</b>できます。<br>相手を3回落とすと<b>アイテム交換券</b>。${K('shop')}で好きなアイテムと交換できます。` },
     { v: null, t: '状態異常', x: () => `スキルで状態異常にかかることがあります。重ねがけされると段階（Lv）が上がり長引きます。<table>${GD.STATUS_KEYS.map((k) => `<tr><td><span class="chip" style="background:${STATUS[k].color}">${STATUS[k].name}</span></td><td>${STATUS_DESC[k]}</td></tr>`).join('')}</table>` },
-    { v: 'rule_gachi', t: '時間で変わるステージ', x: () => `<table><tr><td><b>0:00〜3:00</b></td><td>ギミック期。1分ごとにギミックが変わる（強風・すべる床・ベルトコンベア・崩れる床・消える床・上下する床）</td></tr><tr><td><b>3:00〜</b></td><td>ガチ乱闘期。外周が赤く光ってから30秒ごとに崩れていく。復帰直後の無敵なし</td></tr></table>30秒ごとにイベント抽選：アイテムシャッフル／アイテム配布／停電（真っ暗→全員TP+5）／食中毒（全員5G）。` },
+    { v: 'rule_gachi', t: '時間で変わるステージ', x: () => `<table><tr><td><b>0:00〜3:00</b></td><td>ギミック期。1分ごとにギミックが変わる（強風・すべる床・ベルトコンベア・崩れる床・消える床・上下する床）</td></tr><tr><td><b>3:00〜</b></td><td>ガチ乱闘期。外周が赤く光ってから30秒ごとに崩れていく。復帰直後の無敵なし</td></tr></table>30秒ごとにイベント抽選：アイテムシャッフル／アイテム配布／停電（真っ暗→全員TP+5）／食中毒（全員5G）。<br>ギミック・時間で進むイベント・ランダムイベントは、ロビーの「ルール」でそれぞれオフにできます。` },
     { v: 'rule_mars', t: '9:00 Mars襲来', x: () => `決着がつかないまま9分経つと<b>Mars</b>が降ってきます。周りを叩きつけたり、隕石や流星群を落としてきます。<br>勝つ方法は2つ：<b>耐久値90を削り切る</b>か、<b>3分以内に状態異常を7回当てる</b>。勝てば生き残った全員の勝利。<br>3分を過ぎると毎20秒「★おしまい★」の抽選が始まり、当たると全員敗北です。` },
     { v: 'rule_cookie', t: 'クッキー☆アイテム', x: () => `Mars戦中は<b>SST</b>が出現します。${K('use')}でMarsに使うと<b>30%で撃退</b>（勝利ではなく、ゲームが続く）。<br>${K('use')}長押し＋TP20で<b>改造SST</b>に改造すると確定で撃退できます。<br>撃退すると18:00に<b>Mars（真）</b>が乱入。21:00までに優勝者が出なければ強制終了です。` },
   ];
@@ -325,29 +325,33 @@
       : S.role === 'host' ? `参加者 ${L.members.length}人 ／ 最大8人（CPU含む）　${modeTxt}${team ? '・カードをクリックでチーム変更' : ''}` : (team ? 'カードをクリックでチーム変更' : '');
     ['segCpu', 'segLvl', 'segMode', 'segTeams', 'segFF'].forEach((id, i) => { const v = [L.cpu, L.lvl, L.mode, L.teams, L.ff][i]; $(id).querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.v === v)); });
     $('ruleSum').innerHTML = ruleSummary(L);
-    $('bRuleSet').textContent = isHost ? '⚙ ルール' : '⚙ ルールを見る'; $('bItemSet').textContent = isHost ? '🎁 アイテム' : '🎁 アイテムを見る';
+    $('bRuleSet').innerHTML = ICON('gear', 20) + (isHost ? 'ルール' : 'ルールを見る'); $('bItemSet').innerHTML = ICON('gift', 20) + (isHost ? 'アイテム' : 'アイテムを見る');
+    renderRulePick();
     if (!$('ruleSet').classList.contains('hidden')) renderRules();
     if (!$('itemSet').classList.contains('hidden')) renderItems();
   }
-  function seg(id, key, after) { $(id).querySelectorAll('button').forEach((b) => (b.onclick = () => { S.lobby[key] = +b.dataset.v; if (after) after(); Sfx.play('click'); renderLobby(); pushLobby(); })); }
+  function seg(id, key, after) { $(id).querySelectorAll('button').forEach((b) => (b.onclick = () => { S.lobby[key] = +b.dataset.v; if (after) after(); Sfx.play('click'); saveLobbyOpts(); renderLobby(); pushLobby(); })); }
+  // CPUの数・強さ・モードも次回まで覚えておく
+  function saveLobbyOpts() { const L = S.lobby; try { localStorage.setItem('yb_lobby', JSON.stringify({ cpu: L.cpu, lvl: L.lvl, mode: L.mode, teams: L.teams, ff: L.ff })); } catch (e) { /* noop */ } }
+  try { const o = JSON.parse(localStorage.getItem('yb_lobby') || 'null'); if (o) Object.assign(S.lobby, { cpu: o.cpu ?? 3, lvl: o.lvl ?? 2, mode: o.mode ?? 0, teams: o.teams ?? 2, ff: o.ff ?? 0 }); } catch (e) { /* noop */ }
   seg('segMode', 'mode', rebalance); seg('segTeams', 'teams', rebalance); seg('segFF', 'ff');
   seg('segCpu', 'cpu'); seg('segLvl', 'lvl');
   // ---------- ルール設定（スマブラ風）----------
   const RULE_DEF = { mode: 'stock', stock: 2, time: 3, sd: true, kbRate: 1, startHero: 0, tpRate: 1, skills: true, gimmicks: true, phases: true, events: true };
   const onoff = (v) => (v ? 'あり' : 'なし');
   const RULE_ROWS = [
-    { k: 'mode', name: 'ルール', icon: '🏆', vals: ['stock', 'time', 'stime'], label: (v) => ({ stock: 'ストック制', time: 'タイム制', stime: 'ストック＋時間' }[v]),
+    { k: 'mode', name: 'ルール', icon: 'trophy', vals: ['stock', 'time', 'stime'], label: (v) => ({ stock: 'ストック制', time: 'タイム制', stime: 'ストック＋時間' }[v]),
       desc: (v) => ({ stock: '決まった回数落ちたら脱落。最後まで残った人の勝ち', time: '時間内に何回落としたかで勝負。落とすと+1、落ちると−1', stime: 'ストック制に制限時間つき。時間切れは残りストックが多い人の勝ち' }[v]) },
-    { k: 'stock', name: 'ストック', icon: '♥', vals: [1, 2, 3, 4, 5, 6, 7, 8, 9], label: (v) => v + '機', show: (R) => R.mode !== 'time', desc: () => '場外に落ちてもいい回数' },
-    { k: 'time', name: '制限時間', icon: '⏱', vals: [1, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20], label: (v) => v + '分', show: (R) => R.mode !== 'stock', desc: () => '時間が来たら試合終了' },
-    { k: 'sd', name: 'サドンデス', icon: '💀', vals: [true, false], label: onoff, show: (R) => R.mode !== 'stock', desc: (v) => (v ? '同点ならヘロヘロ値300％・一撃で決着' : '同点なら引き分け') },
-    { k: 'kbRate', name: 'ふっとび率', icon: '💨', vals: [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2], label: (v) => v.toFixed(1) + '倍', desc: () => '大きいほど早く場外まで吹っ飛ぶ' },
-    { k: 'startHero', name: '最初のヘロヘロ値', icon: '😵', vals: [0, 50, 100, 150, 200, 300], label: (v) => v + '%', desc: () => '試合開始時のヘロヘロ値' },
-    { k: 'tpRate', name: 'TPのたまる速さ', icon: '⚡', vals: [0.5, 1, 1.5, 2, 3], label: (v) => v + '倍', desc: () => '大きいほどスキルをたくさん使える' },
-    { k: 'skills', name: 'スキル', icon: '✨', vals: [true, false], label: onoff, desc: (v) => (v ? 'スキル1〜4が使える' : 'パンチと掴みだけで勝負') },
-    { k: 'gimmicks', name: 'ステージギミック', icon: '🌀', vals: [true, false], label: onoff, desc: () => '強風・氷・ベルトコンベア・床崩れなど（1分ごとに変わる）' },
-    { k: 'phases', name: '時間で進むイベント', icon: '🔥', vals: [true, false], label: onoff, desc: () => '3分でガチ乱闘期（ステージが崩れる）、9分でMars襲来' },
-    { k: 'events', name: 'ランダムイベント', icon: '🎲', vals: [true, false], label: onoff, desc: () => '停電・食中毒・アイテム配布・隕石など' },
+    { k: 'stock', name: 'ストック', icon: 'heart', vals: [1, 2, 3, 4, 5, 6, 7, 8, 9], label: (v) => v + '機', show: (R) => R.mode !== 'time', desc: () => '場外に落ちてもいい回数' },
+    { k: 'time', name: '制限時間', icon: 'clock', vals: [1, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20], label: (v) => v + '分', show: (R) => R.mode !== 'stock', desc: () => '時間が来たら試合終了' },
+    { k: 'sd', name: 'サドンデス', icon: 'skull', vals: [true, false], label: onoff, show: (R) => R.mode !== 'stock', desc: (v) => (v ? '同点ならヘロヘロ値300％・一撃で決着' : '同点なら引き分け') },
+    { k: 'kbRate', name: 'ふっとび率', icon: 'wind', vals: [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2], label: (v) => v.toFixed(1) + '倍', desc: () => '大きいほど早く場外まで吹っ飛ぶ' },
+    { k: 'startHero', name: '最初のヘロヘロ値', icon: 'dizzy', vals: [0, 50, 100, 150, 200, 300], label: (v) => v + '%', desc: () => '試合開始時のヘロヘロ値' },
+    { k: 'tpRate', name: 'TPのたまる速さ', icon: 'bolt', vals: [0.5, 1, 1.5, 2, 3], label: (v) => v + '倍', desc: () => '大きいほどスキルをたくさん使える' },
+    { k: 'skills', name: 'スキル', icon: 'sparkle', vals: [true, false], label: onoff, desc: (v) => (v ? 'スキル1〜4が使える' : 'パンチと掴みだけで勝負') },
+    { k: 'gimmicks', name: 'ステージギミック', icon: 'swirl', vals: [true, false], label: onoff, desc: () => '強風・氷・ベルトコンベア・床崩れなど（1分ごとに変わる）' },
+    { k: 'phases', name: '時間で進むイベント', icon: 'flame', vals: [true, false], label: onoff, desc: () => '3分でガチ乱闘期（ステージが崩れる）、9分でMars襲来' },
+    { k: 'events', name: 'ランダムイベント', icon: 'dice', vals: [true, false], label: onoff, desc: () => '停電・食中毒・アイテム配布・隕石など' },
   ];
   const RULE_PRESETS = [
     { n: 'スタンダード', d: 'いつもの乱闘', r: {}, items: null, rate: 2 },
@@ -380,11 +384,20 @@
   function renderRules() {
     const L = S.lobby, R = L.rules, can = S.role !== 'client';
     $('ruleRO').textContent = can ? '' : 'ホストだけが変えられます';
-    $('rulePresets').innerHTML = RULE_PRESETS.map((p, i) => `<button class="rp" data-i="${i}" ${can ? '' : 'disabled'}><b>${p.n}</b><small>${p.d}</small></button>`).join('');
-    $('rulePresets').querySelectorAll('.rp').forEach((b) => (b.onclick = () => { const p = RULE_PRESETS[+b.dataset.i]; L.rules = { ...RULE_DEF, ...p.r }; L.lives = L.rules.stock; L.itemRate = p.rate; if (p.rate) L.items = L.items.length ? L.items : GD.SPAWN_ITEMS.slice(); saveRules(); Sfx.play('pickup'); toast('ルール「' + p.n + '」にしました', 1200); renderRules(); renderLobby(); pushLobby(); }));
+    const PS = allPresets(), curP = matchPreset(L);
+    $('rulePresets').innerHTML = PS.map((p, i) => `<div class="rp ${curP === i ? 'on' : ''} ${p.user ? 'user' : ''}" data-i="${i}" role="button" tabindex="0" ${can ? '' : 'aria-disabled="true"'}>
+        <b>${p.user ? ICON('star', 15) : ''}${esc(p.n)}</b><small>${esc(p.d || presetDesc(p))}</small>
+        ${p.user && can ? `<span class="rpx"><button class="rpb" data-ed="${i}" title="今の設定で上書き">${ICON('pencil', 16)}</button><button class="rpb" data-del="${i}" title="削除">${ICON('trash', 16)}</button></span>` : ''}</div>`).join('')
+      + (can ? `<div class="rp add" id="rpAdd" role="button" tabindex="0"><b>${ICON('plus', 18)}プリセットを作る</b><small>今のルールとアイテムを保存</small></div>` : '');
+    if (can) {
+      $('rulePresets').querySelectorAll('.rp[data-i]').forEach((el) => (el.onclick = (e) => { if (e.target.closest('.rpb')) return; applyPreset(PS[+el.dataset.i]); }));
+      $('rulePresets').querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => { const p = PS[+b.dataset.del]; if (!confirm('プリセット「' + p.n + '」を削除しますか？')) return; savePresets(userPresets().filter((q) => q.id !== p.id)); renderRules(); renderRulePick(); }));
+      $('rulePresets').querySelectorAll('[data-ed]').forEach((b) => (b.onclick = () => { const p = PS[+b.dataset.ed]; const name = prompt('プリセットの名前（今のルールとアイテムで上書きします）', p.n); if (name === null) return; savePresets(userPresets().map((q) => (q.id === p.id ? { ...q, n: (name.trim() || p.n).slice(0, 14), r: { ...L.rules }, items: L.items.slice(), rate: L.itemRate } : q))); toast('上書きしました', 1000); renderRules(); renderRulePick(); }));
+      $('rpAdd').onclick = () => { $('rpNew').classList.remove('hidden'); $('rpName').value = 'マイルール' + (userPresets().length + 1); $('rpName').focus(); $('rpName').select(); };
+    }
     $('ruleRows').innerHTML = RULE_ROWS.filter((r) => !r.show || r.show(R)).map((r) => {
       const v = R[r.k], i = r.vals.findIndex((x) => x === v), def = RULE_DEF[r.k] === v;
-      return `<div class="rr ${def ? '' : 'chg'}" data-k="${r.k}"><span class="ri">${r.icon}</span><div class="rn"><b>${r.name}</b><small>${r.desc(v)}</small></div>
+      return `<div class="rr ${def ? '' : 'chg'}" data-k="${r.k}"><span class="ri">${ICON(r.icon, 34)}</span><div class="rn"><b>${r.name}</b><small>${r.desc(v)}</small></div>
         <div class="rv"><button class="ra" data-d="-1" ${can ? '' : 'disabled'}>◀</button><span class="rvv">${r.label(v)}</span><button class="ra" data-d="1" ${can ? '' : 'disabled'}>▶</button></div></div>`;
     }).join('');
     $('ruleRows').querySelectorAll('.rr').forEach((el) => {
@@ -393,13 +406,57 @@
       el.querySelectorAll('.ra').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); step(+b.dataset.d); }));
       el.querySelector('.rvv').onclick = () => step(1);
     });
-    // マイルール（3つまで保存）
-    const my = (() => { try { return JSON.parse(localStorage.getItem('yb_myrules') || '[]'); } catch (e) { return []; } })();
-    $('ruleMy').innerHTML = can ? `<span class="lab" style="margin:0">マイルール</span>` + [0, 1, 2].map((i) => `<div class="mys"><span>${my[i] ? esc(my[i].name) : '（空き）'}</span><button class="linkb" data-s="${i}">保存</button>${my[i] ? `<button class="linkb" data-l="${i}">呼び出す</button>` : ''}</div>`).join('') + '<button class="linkb" id="ruleReset">初期設定に戻す</button>' : '';
+    $('ruleMy').innerHTML = can ? `<div class="rpnew hidden" id="rpNew"><span class="lab" style="margin:0">新しいプリセットの名前</span><input class="txt" id="rpName" maxlength="14"><button class="btn small" id="rpSave">${ICON('check', 18)}保存</button><button class="linkb" id="rpCancel">やめる</button></div>
+      <button class="linkb" id="ruleReset">${ICON('reset', 16)}初期設定に戻す</button><span class="tiny">プリセットは${userPresets().length}/${PRESET_MAX}個。このブラウザに保存されます</span>` : '';
     if (!can) return;
-    $('ruleMy').querySelectorAll('[data-s]').forEach((b) => (b.onclick = () => { const i = +b.dataset.s; const name = prompt('マイルールの名前', my[i] ? my[i].name : 'マイルール' + (i + 1)); if (name === null) return; my[i] = { name: name.slice(0, 12) || 'マイルール' + (i + 1), rules: L.rules, items: L.items, rate: L.itemRate }; localStorage.setItem('yb_myrules', JSON.stringify(my)); toast('保存しました', 1000); renderRules(); }));
-    $('ruleMy').querySelectorAll('[data-l]').forEach((b) => (b.onclick = () => { const m = my[+b.dataset.l]; L.rules = { ...RULE_DEF, ...m.rules }; L.lives = L.rules.stock; L.items = m.items.filter((k) => GD.SPAWN_ITEMS.includes(k)); L.itemRate = m.rate; saveRules(); Sfx.play('pickup'); toast('「' + m.name + '」を呼び出しました', 1200); renderRules(); renderLobby(); pushLobby(); }));
-    $('ruleReset').onclick = () => { L.rules = { ...RULE_DEF }; L.lives = 2; saveRules(); renderRules(); renderLobby(); pushLobby(); };
+    const doSave = () => {
+      const name = ($('rpName').value || '').trim().slice(0, 14); if (!name) { $('rpName').focus(); return; }
+      const U = userPresets(); if (U.length >= PRESET_MAX) { toast('プリセットは' + PRESET_MAX + '個までです。いらないものを消してね', 2000); return; }
+      U.push({ id: 'u' + Date.now().toString(36), n: name, r: { ...L.rules }, items: L.items.slice(), rate: L.itemRate, user: true });
+      savePresets(U); Sfx.play('pickup'); toast('プリセット「' + name + '」を作りました', 1400); renderRules(); renderRulePick();
+    };
+    $('rpSave').onclick = doSave; $('rpName').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') doSave(); if (e.key === 'Escape') $('rpNew').classList.add('hidden'); };
+    $('rpCancel').onclick = () => $('rpNew').classList.add('hidden');
+    $('ruleReset').onclick = () => { L.rules = { ...RULE_DEF }; L.lives = 2; L.itemRate = 2; L.items = GD.SPAWN_ITEMS.slice(); saveRules(); renderRules(); renderLobby(); pushLobby(); };
+  }
+  // ---------- ルールのプリセット（自分で作れる）----------
+  const PRESET_MAX = 12;
+  function userPresets() {
+    try {
+      let U = JSON.parse(localStorage.getItem('yb_presets') || 'null');
+      if (!U) { // 前のバージョンの「マイルール」を引き継ぐ
+        const old = JSON.parse(localStorage.getItem('yb_myrules') || '[]').filter(Boolean);
+        U = old.map((m, i) => ({ id: 'm' + i, n: m.name, r: m.rules, items: m.items, rate: m.rate, user: true }));
+        localStorage.setItem('yb_presets', JSON.stringify(U));
+      }
+      return U.map((u) => ({ ...u, user: true }));
+    } catch (e) { return []; }
+  }
+  function savePresets(U) { try { localStorage.setItem('yb_presets', JSON.stringify(U)); } catch (e) { /* noop */ } }
+  function allPresets() { return RULE_PRESETS.map((p) => ({ ...p, r: { ...RULE_DEF, ...p.r } })).concat(userPresets().map((u) => ({ ...u, r: { ...RULE_DEF, ...u.r } }))); }
+  function presetDesc(p) { const R = p.r; const m = R.mode === 'time' ? `タイム${R.time}分` : R.mode === 'stime' ? `${R.stock}機・${R.time}分` : `${R.stock}機`; return m + (R.kbRate !== 1 ? `・ふっとび${R.kbRate}倍` : '') + (p.rate === 0 ? '・アイテムなし' : ''); }
+  function sameRules(a, b) { return Object.keys(RULE_DEF).every((k) => a[k] === b[k]); }
+  function matchPreset(L) {
+    const PS = allPresets();
+    // 自分で作ったものを優先して、いまの設定と同じプリセットを探す
+    for (let i = PS.length - 1; i >= 0; i--) { const p = PS[i]; if (!sameRules(p.r, L.rules) || (p.rate ?? 2) !== L.itemRate) continue; if (p.items && (p.items.length !== L.items.length || p.items.some((k) => !L.items.includes(k)))) continue; if (!p.items && p.rate && L.items.length !== GD.SPAWN_ITEMS.length) continue; return i; }
+    return -1;
+  }
+  function applyPreset(p) {
+    const L = S.lobby; L.rules = { ...RULE_DEF, ...p.r }; L.lives = L.rules.stock; L.itemRate = p.rate ?? 2;
+    L.items = p.items ? p.items.filter((k) => GD.SPAWN_ITEMS.includes(k)) : GD.SPAWN_ITEMS.slice();
+    saveRules(); Sfx.play('pickup'); toast('ルール「' + p.n + '」にしました', 1200);
+    if (!$('ruleSet').classList.contains('hidden')) renderRules();
+    renderLobby(); pushLobby();
+  }
+  // ロビーの帯からすぐ選べるプリセット
+  function renderRulePick() {
+    const sel = $('rulePick'), L = S.lobby, can = S.role !== 'client';
+    show('rulePick', can);
+    if (!can) return;
+    const PS = allPresets(), cur = matchPreset(L);
+    sel.innerHTML = `<option value="-1" ${cur < 0 ? 'selected' : ''}>${cur < 0 ? 'カスタム' : 'プリセット'}</option>` + PS.map((p, i) => `<option value="${i}" ${i === cur ? 'selected' : ''}>${p.user ? '★ ' : ''}${esc(p.n)}</option>`).join('');
+    sel.onchange = () => { const i = +sel.value; if (i >= 0) applyPreset(PS[i]); };
   }
   // ---------- アイテム設定（画像つき）----------
   const ITEM_CATS = [
@@ -572,6 +629,7 @@
     if (document.pointerLockElement) document.exitPointerLock();
     show('result', false); show('hud', false);
     screen('vote');
+    $('voteRule').innerHTML = ruleSummary(S.lobby);
     $('voteGrid').innerHTML = opts.concat('random').map((k) => {
       const M = GD.MAPS[k];
       return `<div class="card mapc" data-k="${k}">${M ? `<img src="${mapImg[k]}">` : '<div class="rnd">？</div>'}<div class="nm">${M ? M.name : 'ランダム'}</div><div class="d tiny">${M ? M.desc : 'どれになるかはお楽しみ'}</div><div class="cnt" id="vc_${k}"></div></div>`;
@@ -735,6 +793,11 @@
   document.addEventListener('wheel', (e) => { if (S.mode === 'game') { input.sel = (input.sel + (e.deltaY > 0 ? 1 : -1) + 110) % 11; Sfx.play('click'); } });
   document.addEventListener('keydown', (e) => {
     if (e.target && e.target.tagName === 'INPUT') return;
+    // Escで一番上の画面（操作説明・ルール・設定など）を閉じる
+    if (e.key === 'Escape') {
+      const open = [...document.querySelectorAll('.ov:not(.hidden)')].filter((o) => !['pause', 'result', 'shop', 'vote'].includes(o.id));
+      if (open.length) { open[open.length - 1].classList.add('hidden'); e.preventDefault(); return; }
+    }
     if (S.mode === 'game' && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow'))) e.preventDefault();
     press(e.code);
   });
@@ -755,7 +818,7 @@
     if (S.mobile) { if (sk.parentNode !== $('tSkWrap')) $('tSkWrap').appendChild(sk); if (sel.parentNode !== $('touch')) $('touch').appendChild(sel); }
     else { const me = document.querySelector('#hud .me'); if (sk.parentNode !== me) me.insertBefore(sk, me.querySelector('.slot')); if (sel.parentNode !== $('hud')) $('hud').insertBefore(sel, $('hud').querySelector('.cross')); }
     const MN = { auto: '自動', on: 'オン', off: 'オフ' };
-    $('bMobile').textContent = `📱 モバイル版：${MN[st.mobileMode]}${st.mobileMode === 'auto' ? (S.mobile ? '（オン）' : '（オフ）') : ''}`;
+    $('bMobile').innerHTML = ICON('phone', 18) + `モバイル版：${MN[st.mobileMode]}${st.mobileMode === 'auto' ? (S.mobile ? '（オン）' : '（オフ）') : ''}`;
     const canFull = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
     show('bFull', S.mobile && canFull); show('bFull2', S.mobile && canFull);
     $('shopNote').textContent = S.mobile ? 'アイテムをタップで交換' : '数字キーかクリックで交換 ／ T か Esc でとじる';
@@ -897,7 +960,7 @@
   const fmt = (t) => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
   const PH = { gimmick: 'ギミック期', gachi: 'ガチ乱闘期', mars: 'Mars襲来', curtain: 'カーテンコール' };
   function hud(s, dt) {
-    const sc = Math.min(1, window.innerWidth / 1380, window.innerHeight / 760);
+    const sc = Math.max(0.5, Math.min(1.3, window.innerWidth / 1380, window.innerHeight / 760));
     document.documentElement.style.setProperty('--hs', sc.toFixed(3));
     const me = s.p.find((p) => p.id === S.myPid);
     const ru = s.ru || { mo: 'stock', tl: 0, sd: 0, ph: 1 };
@@ -1030,7 +1093,7 @@
     $('resT').textContent = res.text;
     const tm = s.ru && s.ru.mo === 'time';
     const rows = s.p.filter((p) => !p.mi || !p.e).slice().sort((a, b) => (res.winners.includes(b.id) - res.winners.includes(a.id)) || (tm ? ((b.sc | 0) - (a.sc | 0)) : (a.e - b.e) || (b.l - a.l)) || (b.k - a.k));
-    $('resTb').innerHTML = `<tr><th>#</th>${s.tmode ? '<th>チーム</th>' : ''}<th>プレイヤー</th><th>キャラ</th><th>撃墜</th><th>${tm ? 'スコア' : 'ライフ'}</th></tr>` + rows.map((p, i) => `<tr class="${res.winners.includes(p.id) ? 'win' : ''}"><td>${i + 1}</td>${s.tmode ? `<td><span class="tbadge" style="position:static;background:${GD.TEAMS[p.tm].css}">${GD.TEAMS[p.tm].name}</span></td>` : ''}<td>${esc(p.n)}</td><td>${CHARS[p.c].name}</td><td>${p.k}</td><td>${tm ? ((p.sc > 0 ? '+' : '') + (p.sc | 0)) : p.e ? '脱落' : p.l}</td></tr>`).join('');
+    $('resTb').innerHTML = `<tr><th>#</th>${s.tmode ? '<th>チーム</th>' : ''}<th>プレイヤー</th><th>キャラ</th><th>撃墜</th><th>落下</th><th>${tm ? 'スコア' : 'ストック'}</th></tr>` + rows.map((p, i) => `<tr class="${res.winners.includes(p.id) ? 'win' : ''}"><td>${i + 1}</td>${s.tmode ? `<td><span class="tbadge" style="position:static;background:${GD.TEAMS[p.tm].css}">${GD.TEAMS[p.tm].name}</span></td>` : ''}<td>${esc(p.n)}</td><td>${CHARS[p.c].name}</td><td>${p.k}</td><td>${(p.k - (p.sc | 0))}</td><td>${tm ? ((p.sc > 0 ? '+' : '') + (p.sc | 0)) : p.e ? '脱落' : p.l}</td></tr>`).join('');
     const isHost = S.role !== 'client';
     $('bResLobby').classList.toggle('hidden', !isHost);
     $('bResLobby').textContent = S.role === 'solo' ? 'もう一回！' : 'すぐロビーへ';
@@ -1152,9 +1215,13 @@
     }).join('') || '<div class="tiny">この種類の更新はまだありません</div>';
   }
   function logLatest() { const L = window.CHANGELOG || []; return L.length ? L[0].v : ''; }
+  document.querySelectorAll('[data-ico]').forEach((el) => { el.outerHTML = ICON(el.dataset.ico, +(el.dataset.size || 20), el.className); });
+  const openLog = () => { renderLog(); show('changelog'); Sfx.play('click'); try { localStorage.setItem('yb_logSeen', logLatest()); } catch (e) { /* noop */ } show('logNew', false); };
+  $('bLog2').onclick = openLog; $('bLog3').onclick = openLog;
   $('bLog').onclick = () => { renderLog(); show('changelog'); Sfx.play('click'); try { localStorage.setItem('yb_logSeen', logLatest()); } catch (e) { /* noop */ } show('logNew', false); };
   try { show('logNew', localStorage.getItem('yb_logSeen') !== logLatest()); } catch (e) { /* noop */ }
   $('verTag').textContent = logLatest() ? 'v' + logLatest() : '';
+  $('logVerBtn').textContent = logLatest() ? 'v' + logLatest() : '';
   // タブを閉じたらすぐ切断を知らせる
   window.addEventListener('pagehide', () => { try { Net.close(); } catch (e) { /* noop */ } });
   Settings.apply();

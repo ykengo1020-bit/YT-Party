@@ -68,7 +68,7 @@ window.AI = (function () {
       }
       // スキル
       const sk = GD.CHARS[p.char].skills;
-      if (Math.random() < 0.18 + lvl * 0.05) {
+      if ((!g.rules || g.rules.skills) && Math.random() < 0.18 + lvl * 0.05) {
         const k = (Math.random() * sk.length) | 0;
         // 自分に不利な状態異常をかけるスキルはCPUは使わない（ゆるるはマジギレ・狂気が無害）
         const selfBad = { surume: 1, kirinuki: 1, rinri: p.char !== 'yururu', kichige: p.char !== 'yururu' && Math.random() < 0.6 };

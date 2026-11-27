@@ -2,13 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>友情ブレイカーズ - 3D乱闘パーティー</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2.8">
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -25,8 +26,8 @@
     <button class="btn pink" id="bHost">オンラインの部屋を作る</button>
     <div class="row"><input id="roomIn" class="txt" maxlength="5" placeholder="部屋コード"><button class="btn cyan" id="bJoin" style="flex:0 0 auto">参加</button></div>
     <div class="err" id="tErr"></div>
-    <div class="row"><button class="btn white small" id="bHelp">操作説明</button><button class="btn white small" id="bRules">ルール説明</button><button class="btn white small" id="bSet">設定</button><button class="btn white small logbtn" id="bLog">更新履歴<span class="newdot hidden" id="logNew">NEW</span></button></div>
-    <div class="row mobrow"><button class="btn white small" id="bMobile"></button><button class="btn white small hidden" id="bFull" style="flex:0 0 auto">全画面</button></div>
+    <div class="row"><button class="btn white small" id="bHelp">操作説明</button><button class="btn white small" id="bRules">ルール説明</button><button class="btn white small" id="bSet">設定</button></div>
+    <div class="row mobrow"><button class="btn white small logbtn" id="bLog"><span data-ico="scroll"></span>更新履歴 <b class="lver" id="logVerBtn"></b><span class="newdot hidden" id="logNew">NEW</span></button><button class="btn white small" id="bMobile"></button><button class="btn white small hidden" id="bFull" style="flex:0 0 auto">全画面</button></div>
     <div class="tiny">オンライン対戦はブラウザ同士の直接通信です。接続の仲介にPeerJSの無料サーバーを使うのでネット接続が必要です。</div>
   </div>
 </div>
@@ -47,12 +48,12 @@
         <div class="h1" id="lbTitle">ロビー</div>
         <div id="codeBox"><div class="tiny">部屋コード（友達に伝えてね）</div><div class="row" style="gap:10px"><div class="code" id="code">-----</div><button class="btn small white" id="bCopy" style="flex:0 0 auto">コピー</button></div></div>
       </div>
-      <div style="flex:0 0 auto;text-align:right;display:flex;gap:8px"><button class="btn small white" id="bSet2">設定</button><button class="btn small cyan" id="bChar">キャラ変更</button></div>
+      <div style="flex:0 0 auto;text-align:right;display:flex;gap:8px"><button class="btn small white" id="bLog3"><span data-ico="scroll"></span>更新履歴</button><button class="btn small white" id="bSet2">設定</button><button class="btn small cyan" id="bChar">キャラ変更</button></div>
     </div>
     <div class="members" id="members"></div>
     <div class="rulebar" id="ruleBar">
       <div class="rb-sum" id="ruleSum"></div>
-      <div class="rb-btns"><button class="btn small yel" id="bRuleSet">⚙ ルール</button><button class="btn small cyan" id="bItemSet">🎁 アイテム</button></div>
+      <div class="rb-btns"><select id="rulePick" class="rpick" title="プリセット"></select><button class="btn small yel" id="bRuleSet"></button><button class="btn small cyan" id="bItemSet"></button></div>
     </div>
     <div id="hostOpts">
       <div class="row" style="gap:18px;flex-wrap:wrap;margin-bottom:6px">
@@ -79,6 +80,7 @@
 <div id="vote" class="screen hidden">
   <div class="panel" style="width:min(1100px,96vw)">
     <div class="row" style="justify-content:space-between"><div class="h1" style="flex:0 0 auto">マップ投票</div><div style="flex:0 0 auto;text-align:right"><div class="code" id="voteT" style="font-size:30px;letter-spacing:.05em">残り 12秒</div><div class="tiny" id="voteN"></div></div></div>
+    <div class="rulebar slim" id="voteRule"></div>
     <div class="tiny" style="margin-bottom:10px">遊びたいマップをクリック！一番票が多いマップに決まります（同票はランダム）</div>
     <div class="grid votegrid" id="voteGrid"></div>
   </div>
@@ -123,7 +125,7 @@
     <button class="tb it sm" data-a="drop" style="--x:118;--y:176;--s:50">投げ</button>
   </div>
 </div>
-<div id="rotate" class="hidden"><div><div class="ph">📱</div>スマホを横向きにしてね</div></div>
+<div id="rotate" class="hidden"><div><div class="ph" data-ico="phone" data-size="80"></div>スマホを横向きにしてね</div></div>
 
 <!-- 操作説明 -->
 <div id="help" class="ov hidden"><div class="panel helppanel">
@@ -135,7 +137,7 @@
 
 <!-- ルール設定（スマブラ風） -->
 <div id="ruleSet" class="ov hidden"><div class="panel rulepanel">
-  <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="h1" style="flex:0 0 auto;margin:0">⚙ ルール</div>
+  <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="h1" style="flex:0 0 auto;margin:0"><span data-ico="gear" data-size="34"></span>ルール</div>
     <div style="flex:0 0 auto;display:flex;gap:8px;align-items:center"><span class="tiny" id="ruleRO"></span><button class="btn small" data-close>決定</button></div></div>
   <div class="rpresets" id="rulePresets"></div>
   <div class="rrows" id="ruleRows"></div>
@@ -144,7 +146,7 @@
 
 <!-- アイテム設定 -->
 <div id="itemSet" class="ov hidden"><div class="panel itempanel">
-  <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="h1" style="flex:0 0 auto;margin:0">🎁 アイテム</div>
+  <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="h1" style="flex:0 0 auto;margin:0"><span data-ico="gift" data-size="34"></span>アイテム</div>
     <div style="flex:0 0 auto;display:flex;gap:8px;align-items:center"><span class="tiny" id="itemRO"></span><button class="btn small" data-close>決定</button></div></div>
   <div class="irate"><span class="lab" style="margin:0">出現量</span><div class="seg" id="segRate2"></div><span class="tiny" id="itemCount"></span></div>
   <div class="ipresets" id="itemPresets"></div>
@@ -153,7 +155,7 @@
 
 <!-- 更新履歴 -->
 <div id="changelog" class="ov hidden"><div class="panel logpanel">
-  <div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="h1" style="flex:0 0 auto;margin:0">📜 更新履歴</div>
+  <div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="h1" style="flex:0 0 auto;margin:0"><span data-ico="scroll" data-size="34"></span>更新履歴</div>
     <div style="flex:0 0 auto;display:flex;gap:8px;align-items:center"><span class="tiny" id="logVer"></span><button class="btn small" data-close>とじる</button></div></div>
   <div class="logfilter" id="logFilter"></div>
   <div class="loglist" id="logList"></div>
@@ -198,6 +200,7 @@
   <button class="btn white" id="bHelp2">操作説明</button>
   <button class="btn white" id="bSet3">設定</button>
   <button class="btn white" id="bRules2">ルール説明</button>
+  <button class="btn white" id="bLog2"><span data-ico="scroll"></span>更新履歴</button>
   <button class="btn white hidden" id="bFull2">全画面にする</button>
   <button class="btn white" id="bQuit">タイトルへ戻る</button>
 </div></div>
@@ -210,16 +213,17 @@
   <div class="tiny" id="resNote" style="text-align:center;margin-top:8px"></div>
 </div></div>
 
-<script src="vendor/three.min.js"></script>
-<script src="vendor/peerjs.min.js"></script>
-<script src="js/data.js"></script>
-<script src="js/settings.js"></script>
-<script src="js/sim.js"></script>
-<script src="js/ai.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/render.js"></script>
-<script src="js/net.js"></script>
-<script src="js/changelog.js"></script>
-<script src="js/main.js"></script>
+<script src="vendor/three.min.js?v=2.8"></script>
+<script src="vendor/peerjs.min.js?v=2.8"></script>
+<script src="js/data.js?v=2.8"></script>
+<script src="js/settings.js?v=2.8"></script>
+<script src="js/sim.js?v=2.8"></script>
+<script src="js/ai.js?v=2.8"></script>
+<script src="js/audio.js?v=2.8"></script>
+<script src="js/render.js?v=2.8"></script>
+<script src="js/net.js?v=2.8"></script>
+<script src="js/changelog.js?v=2.8"></script>
+<script src="js/icons.js?v=2.8"></script>
+<script src="js/main.js?v=2.8"></script>
 </body>
 </html>
