@@ -346,7 +346,7 @@ window.Sim = (function () {
         case 'rhythmrev': p.buffs.rhythmrev = 40; break;
         case 'goreisan': p.st = {}; this.emit({ k: 'txt', id: p.id, s: 'スッキリ！', c: '#86efac' }); break;
         case 'mousou':
-          if (rnd() < 0.65) { p.buffs.tpx2 = 60; p.buffs.ken = { k: 0, t: 60 }; this.emit({ k: 'txt', id: p.id, s: '楽しい妄想！TP2倍＆パワーUP', c: '#fbcfe8' }); }
+          if (rnd() < 0.75) { p.buffs.tpx2 = 60; p.buffs.ken = { k: 0, t: 60 }; this.emit({ k: 'txt', id: p.id, s: '楽しい妄想！TP2倍＆パワーUP', c: '#fbcfe8' }); }
           else { if (p.tp >= 3) p.tp -= 3; else { p.tp = 0; p.hero = clamp(p.hero + 40, 0, 999); } this.emit({ k: 'txt', id: p.id, s: '嫌な事を思い出した…', c: '#94a3b8' }); }
           break;
         case 'rinri': this.applyStatus(p, 'kyouki', 1, { force: true }); break;
@@ -394,7 +394,7 @@ window.Sim = (function () {
           break;
         }
         case 'edit':
-          if (rnd() < 2 / 3) { all((q) => this.hit(q, p, 25, 2.5, q.x - p.x, q.z - p.z, 0.3, { unblock: true })); if (this.mars) this.damageMars(p, 3); }
+          if (rnd() < 2 / 3) { all((q) => this.hit(q, p, 18, 2.2, q.x - p.x, q.z - p.z, 0.3, { unblock: true })); if (this.mars) this.damageMars(p, 3); }
           else { p.hero = clamp(p.hero + 20, 0, 999); this.emit({ k: 'txt', id: p.id, s: '撮影データが消し飛んだ', c: '#9ca3af' }); }
           break;
         case 'snipe': {
@@ -415,12 +415,12 @@ window.Sim = (function () {
       if (!sp || sp === 'rhythm') return;
       if (p.spCD > 0) { this.emit({ k: 'deny', id: p.id }); return; }
       if (sp === 'bike') { p.buffs.bike = 6; p.spCD = 70; this.emit({ k: 'txt', id: p.id, s: 'バイク召喚！', c: '#fb923c' }); this.emit({ k: 'sfx', n: 'bike' }); }
-      if (sp === 'weapon') { if (p.item) this.dropItem(p); const w = ['ar', 'sr', 'sg'][p.input.sel % 3]; this.giveItem(p, w); p.spCD = 40; }
+      if (sp === 'weapon') { if (p.item) this.dropItem(p); const w = ['ar', 'sr', 'sg'][p.input.sel % 3]; this.giveItem(p, w); p.spCD = 55; }
       if (sp === 'scythe') {
         const ay = p.input.ay, ap = clamp(p.input.ap, -0.4, 1.2);
         const s = 19;
         p.vx = Math.sin(ay) * Math.cos(ap) * s; p.vz = Math.cos(ay) * Math.cos(ap) * s; p.vy = Math.sin(ap) * s + 4;
-        p.yaw = ay; p.ledge = null; p.dashT = 0.3; p.spCD = 80; p.scy = 0.4;
+        p.yaw = ay; p.ledge = null; p.dashT = 0.3; p.spCD = 90; p.scy = 0.4;
         this.emit({ k: 'txt', id: p.id, s: '大鎌！', c: '#ef4444' }); this.emit({ k: 'sfx', n: 'dash' });
       }
     }
@@ -747,8 +747,8 @@ window.Sim = (function () {
       // ヘロヘロ自然回復
       // パッシブ
       p.timers.pas -= dt;
-      if (p.char === 'kenken' && p.timers.pas <= 0) { p.timers.pas = 20; const k = (rnd() * 3) | 0; p.buffs.ken = { k, t: 15 }; this.emit({ k: 'txt', id: p.id, s: ['パワー', 'スピード', '重さ'][k] + 'UP', c: '#93c5fd' }); }
-      if (p.char === 'cotton' && p.timers.pas <= 0) { p.timers.pas = 20; const k = (rnd() * 3) | 0; if (p.cot[k] < 3) { p.cot[k]++; this.emit({ k: 'txt', id: p.id, s: ['パワー', 'スピード', '重さ'][k] + '+1', c: '#e5e7eb' }); } }
+      if (p.char === 'kenken' && p.timers.pas <= 0) { p.timers.pas = 15; const k = (rnd() * 3) | 0; p.buffs.ken = { k, t: 13 }; this.emit({ k: 'txt', id: p.id, s: ['パワー', 'スピード', '重さ'][k] + 'UP', c: '#93c5fd' }); }
+      if (p.char === 'cotton' && p.timers.pas <= 0) { p.timers.pas = 14; const k = (rnd() * 3) | 0; if (p.cot[k] < 3) { p.cot[k]++; this.emit({ k: 'txt', id: p.id, s: ['パワー', 'スピード', '重さ'][k] + '+1', c: '#e5e7eb' }); } }
       if (p.char === 'yururu') { p.timers.yu -= dt; if (p.timers.yu <= 0) { p.timers.yu = 45; this.applyStatus(p, pick(['lag', 'keyboard', 'g5', 'nanchou']), 1, { force: true, dur: 6 }); } }
       // 5G：腹痛
       if (this.has(p, 'g5')) { p.timers.g5 -= dt; if (p.timers.g5 <= 0) { p.timers.g5 = 10; p.crouchT = 2; this.emit({ k: 'txt', id: p.id, s: 'お腹が…', c: '#a16207' }); } }

@@ -62,7 +62,7 @@
         <div class="row" style="align-items:baseline;gap:12px"><h3 style="flex:0 0 auto;margin:0">${C.name}</h3><div class="d">${C.desc}</div></div>
         <div class="d" style="margin:4px 0 6px">状態異常耐性：<b>${resName}</b>${C.weak.length ? '（' + C.weak.map((w) => STATUS[w].name).join('・') + 'にかかりやすい）' : ''}</div></div>
       <div><div class="tiny" style="margin-bottom:2px">技をクリックすると上に動画が出ます</div>
-        <div class="sk ${hasSp ? 'click' : ''} ${selSkill === 'p' ? 'on' : ''}" data-s="p">${hasSp ? '<span class="play">▶ 動画</span>' : ''}<b>パッシブ【${C.passive.name}】</b><br>${C.passive.desc}</div>
+        <div class="sk ${hasSp ? 'click' : ''} ${selSkill === 'p' ? 'on' : ''}" data-s="p">${hasSp ? '<span class="play">▶ 動画</span>' : ''}<b>パッシブ【${C.passive.name}】</b><br>${keyDesc(C.passive.desc)}</div>
         ${C.skills.map((sk, i) => `<div class="sk click ${selSkill === i ? 'on' : ''}" data-s="${i}"><span class="play">▶ 動画</span><span class="key">${Settings.key('s' + (i + 1))}</span><span class="tp">TP${sk.tp}</span><b>${sk.name}</b><br>${sk.desc}</div>`).join('')}</div>`;
     const v = $('skVid');
     v.src = selSkill === 'p' ? `media/skills/sp_${selCur}.mp4` : `media/skills/sk_${selCur}_${selSkill}.mp4`;
@@ -192,6 +192,8 @@
     $('helpTip').innerHTML = 'キーやマウス感度は「設定」から好きなように変えられます。この画面の表示も変えたキーに合わせて変わります。';
     $('hint').textContent = `[${Settings.key('help')}] 操作説明　[${Settings.key('mute')}] 音　[Esc] 設定・メニュー`;
   }
+  // 説明文の [V] [G] などを、いまのキー設定（モバイル版ならボタン名）に置き換える
+  function keyDesc(t) { return String(t).replace('[V]', `[${Settings.key('v')}]`).replace('[G]', `[${Settings.key('g')}]`).replace('ホイールで', S.mobile ? '白い帯をタップして' : 'ホイールで'); }
   // モバイル版の操作説明
   function updateKeyTextsMobile() {
     const COL = { punch: '#ef4444', jump: '#3b82f6', grab: '#f97316', guard: '#0ea5e9', head: '#e11d48', dash: '#6366f1', use: '#16a34a', drop: '#65a30d' };
@@ -344,9 +346,22 @@
   // ---------- ネット（ホスト側）----------
   function setupHostNet() {
     Net.on('join', (pid) => { /* helloを待つ */ });
+    S.seen = new Map();
+    clearInterval(S.hbTimer);
+    // 接続の見張り：PeerJSは相手がタブを閉じても切断に気づかないことがあるので、合図が8秒来なければ抜けたことにする
+    S.hbTimer = setInterval(() => {
+      if (S.role !== 'host') { clearInterval(S.hbTimer); return; }
+      Net.broadcast({ t: 'ping' });
+      const now = performance.now();
+      for (const [pid, at] of S.seen) if (now - at > 8000) { S.seen.delete(pid); Net.kick && Net.kick(pid); hostLeave(pid); }
+    }, 2000);
     Net.on('data', (pid, d) => {
       if (!d || !d.t) return;
+      S.seen.set(pid, performance.now());
+      if (d.t === 'ping') return;
       if (d.t === 'hello') {
+        const ex = S.lobby.members.find((m) => m.key === pid);
+        if (ex) { ex.name = String(d.name || '?').slice(0, 10); if (CHARS[d.char]) ex.char = d.char; renderLobby(); pushLobby(); return; }
         if (S.lobby.members.length >= 8) { Net.send(pid, { t: 'full' }); return; }
         S.lobby.members.push({ key: pid, name: String(d.name || '?').slice(0, 10), char: CHARS[d.char] ? d.char : 'kenken', team: smallestTeam() });
         renderLobby(); pushLobby(); Sfx.play('pickup');
@@ -362,13 +377,17 @@
         if (p && !p.bot) p.input = sanitize(d.i);
       }
     });
-    Net.on('leave', (pid) => {
+    Net.on('leave', (pid) => hostLeave(pid));
+  }
+  function hostLeave(pid) {
+    {
+      if (S.seen) S.seen.delete(pid);
       const i = S.lobby.members.findIndex((m) => m.key === pid);
       if (i >= 0) { toast(S.lobby.members[i].name + ' が抜けました'); S.lobby.members.splice(i, 1); }
-      if (S.game) { const p = S.game.players.find((x) => x.id === S.peerMap.get(pid)); if (p) { p.bot = true; p.cpu = 2; p.name += '(CPU)'; } }
+      if (S.game) { const p = S.game.players.find((x) => x.id === S.peerMap.get(pid)); if (p && !p.bot) { p.bot = true; p.cpu = 2; p.name += '(CPU)'; } }
       if (S.vote) { delete S.vote.votes[pid]; voteUpdate(); }
       renderLobby(); pushLobby();
-    });
+    }
   }
   function sanitize(i) {
     const o = { mx: +i.mx || 0, mz: +i.mz || 0, ay: +i.ay || 0, ap: +i.ap || 0, b: {}, c: {}, sel: (i.sel | 0), useHold: !!i.useHold, buy: null };
@@ -379,8 +398,17 @@
   }
   // ---------- ネット（参加者側）----------
   function setupClientNet() {
+    S.hostSeen = performance.now();
+    clearInterval(S.hbTimer);
+    S.hbTimer = setInterval(() => {
+      if (S.role !== 'client') { clearInterval(S.hbTimer); return; }
+      Net.sendHost({ t: 'ping' });
+      if (performance.now() - S.hostSeen > 10000) { clearInterval(S.hbTimer); toast('ホストとの接続が切れました', 3500); toTitle(); }
+    }, 2000);
     Net.on('data', (pid, d) => {
       if (!d || !d.t) return;
+      S.hostSeen = performance.now();
+      if (d.t === 'ping') return;
       if (d.t === 'lobby') {
         Object.assign(S.lobby, d.L);
         if (S.mode === 'game' && S.ended) { endGameView(); S.mode = 'lobby'; }
@@ -509,7 +537,7 @@
     beginGameView();
   }
   function beginGameView() {
-    S.mode = 'game'; S.ended = false; S.acc = 0; S.netAcc = 0;
+    S.mode = 'game'; S.ended = false; S.acc = 0; S.netAcc = 0; S.simLast = null; S.evQ = [];
     SCREENS.forEach((s) => show(s, false)); show('result', false);
     show('hud'); Render.clear();
     $('board').innerHTML = '';
@@ -948,6 +976,35 @@
     }
     return s;
   }
+  // ホスト／ソロのゲーム計算。画面の描画とは切り離し、ホストのタブが裏に回っても止まらないようにする
+  function simTick(now) {
+    const g = S.game; if (!g || S.mode !== 'game') return;
+    if (S.simLast === undefined || S.simLast === null) S.simLast = now;
+    const dt = Math.min(0.25, Math.max(0, (now - S.simLast) / 1000)); S.simLast = now;
+    if (!S.paused) {
+      S.acc += dt;
+      let n = 0;
+      while (S.acc >= STEP && n < 16) {
+        S.acc -= STEP; n++;
+        for (const p of g.players) if (p.bot || p.minion) AI.think(g, p, STEP);
+        g.step(STEP);
+      }
+      if (S.acc > STEP) S.acc = 0;
+    }
+    const ev = g.fx.splice(0);
+    if (!document.hidden) S.evQ.push(...ev); else S.evQ.length = 0;
+    if (S.role === 'host') {
+      S.pendFx = (S.pendFx || []).concat(ev);
+      S.netAcc += dt;
+      if (S.netAcc >= 0.05) { S.netAcc = 0; Net.broadcast({ t: 's', s: g.snapshot(), f: S.pendFx }); S.pendFx = []; }
+    }
+  }
+  S.evQ = [];
+  // 裏のタブでも動くタイマー（Workerのタイマーはブラウザに間引かれにくい）
+  try {
+    const wk = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),1000/60)'], { type: 'text/javascript' })));
+    wk.onmessage = () => { if (document.hidden && S.role === 'host' && S.mode === 'game') simTick(performance.now()); };
+  } catch (e) { /* Workerが使えないときは描画と一緒に動く */ }
   function frame(now) {
     requestAnimationFrame(frame);
     let dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -963,21 +1020,9 @@
       const g = S.game;
       const me = g.players.find((p) => p.id === S.myPid);
       if (me) me.input = { ...inp, b: { ...inp.b }, c: { ...inp.c } };
-      if (!S.paused) {
-        S.acc += dt;
-        while (S.acc >= STEP) {
-          S.acc -= STEP;
-          for (const p of g.players) if (p.bot || p.minion) AI.think(g, p, STEP);
-          g.step(STEP);
-        }
-      }
-      events = g.fx.splice(0);
+      simTick(now);
+      events = S.evQ.splice(0);
       snap = g.snapshot();
-      if (S.role === 'host') {
-        S.pendFx = (S.pendFx || []).concat(events.filter((e) => e.k !== 'sfx' || true));
-        S.netAcc += dt;
-        if (S.netAcc >= 0.05) { S.netAcc = 0; Net.broadcast({ t: 's', s: snap, f: S.pendFx }); S.pendFx = []; }
-      }
     }
     if (!snap) { Render.idle(dt); return; }
     S.lastSnap = snap;
@@ -992,6 +1037,8 @@
     drawGamechu(dt);
     if (snap.ov && !S.ended) showResult(snap.ov, snap);
   }
+  // タブを閉じたらすぐ切断を知らせる
+  window.addEventListener('pagehide', () => { try { Net.close(); } catch (e) { /* noop */ } });
   Settings.apply();
   requestAnimationFrame(frame);
   window.__S = S; window.__cam = cam; // デバッグ用

@@ -26,6 +26,14 @@ window.AI = (function () {
 
     // ステージ外：中央へ戻る
     const below = groundAt(g, p.x, p.z, p.y);
+    if (A.cross) { A.cross.t -= dt; if (A.cross.t <= 0 || (p.ground && A.cross.t < 0.9)) A.cross = null; }
+    if (!p.ground && !below && A.cross) {
+      // 隙間を飛び越えている途中：向こう岸へ進み続け、必要なら二段ジャンプ
+      inp.mx = A.cross.mx; inp.mz = A.cross.mz; inp.ay = Math.atan2(A.cross.mx, A.cross.mz); inp.ap = 0;
+      if (A.gapJ && p.airJ > 0 && p.vy < 0.8) { press(inp, 'jump'); A.gapJ = false; }
+      if (p.y < (A.crossY || 0) - 1.2) A.cross = null; // 落ち始めたら普段の復帰へ
+      return;
+    }
     if (!p.ground && !below) {
       // 一番近い床へ戻る
       let tx = 0, tz = 0, bd = 1e9;
@@ -102,10 +110,11 @@ window.AI = (function () {
     const ax = p.x + mx * 2.2, az = p.z + mz * 2.2;
     const ahead = (mx || mz) ? groundAt(g, ax, az, p.y) : true;
     if ((mx || mz) && !ahead) {
-      const far = groundAt(g, p.x + mx * 3.8, p.z + mz * 3.8, p.y);
-      if (far && far.top <= p.y + 0.9 && p.ground && !p.grab) {
-        // 隙間をジャンプで越える
-        if (len2(gx - p.x, gz - p.z) > 2.5 || A.goMars || A.itemGoal) press(inp, 'jump');
+      let far = null, farD = 0;
+      for (const fd of [3.0, 3.8, 4.6, 5.4]) { const f = groundAt(g, p.x + mx * fd, p.z + mz * fd, p.y + 1.8); if (f && f.top <= p.y + 1.8) { far = f; farD = fd; break; } }
+      if (far && p.ground && !p.grab) {
+        // 隙間をジャンプで越える（遠い・高いときは二段ジャンプ）
+        if (len2(gx - p.x, gz - p.z) > 2.5 || A.goMars || A.itemGoal) { press(inp, 'jump'); A.gapJ = farD > 3.9 || far.top > p.y + 0.9; A.cross = { mx, mz, t: 1.4 }; A.crossY = p.y; }
         else { mx = 0; mz = 0; }
       } else if (p.ground) {
         // 端から離れる
@@ -114,6 +123,12 @@ window.AI = (function () {
         if (!groundAt(g, p.x + mx * 1.5, p.z + mz * 1.5, p.y)) { mx = -mx; mz = -mz; }
       }
     } else if (ahead && ahead !== true && ahead.top > p.y + 0.3 && p.ground) press(inp, 'jump'); // 段差を登る
+    // 相手が浮き床や高い足場の上にいるときは真下まで行ってジャンプ→二段ジャンプで登る
+    if (t && !A.itemGoal && t.ground && t.y > p.y + 1.0 && t.y < p.y + 5.5 && len2(t.x - p.x, t.z - p.z) < 3.4) {
+      mx = dx / d; mz = dz / d;
+      if (p.ground) press(inp, 'jump');
+      else if (p.airJ > 0 && p.vy < 1.5) press(inp, 'jump');
+    }
     inp.mx = mx; inp.mz = mz;
     inp.ay = Math.atan2(dx, dz); inp.ap = 0;
 

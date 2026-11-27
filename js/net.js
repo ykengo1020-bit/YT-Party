@@ -65,9 +65,10 @@ window.Net = (function () {
   function sendHost(d) { if (hostConn && hostConn.open) hostConn.send(d); }
   function send(pid, d) { const c = conns.get(pid); if (c && c.open) c.send(d); }
   function broadcast(d) { for (const c of conns.values()) if (c.open) c.send(d); }
+  function kick(pid) { const c = conns.get(pid); conns.delete(pid); try { if (c) c.close(); } catch (e) { /* noop */ } }
   function close() {
     try { if (peer) peer.destroy(); } catch (e) { /* noop */ }
     peer = null; role = null; conns.clear(); hostConn = null;
   }
-  return { on, host, join, send, sendHost, broadcast, close, get role() { return role; }, get count() { return conns.size; }, get myId() { return peer ? peer.id : null; } };
+  return { on, kick, host, join, send, sendHost, broadcast, close, get role() { return role; }, get count() { return conns.size; }, get myId() { return peer ? peer.id : null; } };
 })();
