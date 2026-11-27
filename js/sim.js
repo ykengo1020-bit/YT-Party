@@ -8,6 +8,8 @@ window.Sim = (function () {
   const rnd = () => rng();
   const pick = (a) => a[(rnd() * a.length) | 0];
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  // スキルごとのモーションの長さ（秒）
+  const CAST_DUR = { kichige: 1.0, fish: 1.1, sniper: 1.0, snipe: 0.9, build: 1.1, rhythmrev: 1.0, rasher: 1.0, rinri: 1.0, mousou: 1.1, tenjou: 1.1, mt: 0.9, sherpa: 1.1, edit: 1.0, modifier: 0.9, chudoku: 1.0, soundboard: 1.0, goreisan: 1.0, surume: 1.1, kirinuki: 1.0, positive: 1.0, muku: 0.9, mic: 0.9, role: 0.8, subaka: 0.9 };
   const len2 = (x, z) => Math.sqrt(x * x + z * z);
 
   function emptyInput() {
@@ -333,7 +335,7 @@ window.Sim = (function () {
         const kind = AOE.includes(sk.id) ? 'aoe' : AIM.includes(sk.id) ? 'aim' : 'self';
         const tg = kind === 'aoe' ? this.others(p).filter((q) => !q.minion).map((q) => q.id) : kind === 'aim' ? [(this.aimTarget(p) || {}).id].filter(Boolean) : [];
         this.emit({ k: 'cast', id: p.id, sid: sk.id, kind, tg, c: CHARS[p.char].color, x: p.x, y: p.y, z: p.z, yw: p.yaw });
-        p.castT = 0.5;
+        p.castSid = sk.id; p.castDur = CAST_DUR[sk.id] || 0.8; p.castT = p.castDur;
       }
       this.emit({ k: 'sfx', n: 'skill' });
       const O = this.others(p);
@@ -424,7 +426,7 @@ window.Sim = (function () {
       const sp = CHARS[p.char].passive.special;
       if (!sp || sp === 'rhythm') return;
       if (p.spCD > 0) { this.emit({ k: 'deny', id: p.id }); return; }
-      if (sp === 'bike' || sp === 'weapon') { this.emit({ k: 'cast', id: p.id, sid: sp, kind: 'self', tg: [], c: CHARS[p.char].color, x: p.x, y: p.y, z: p.z, yw: p.yaw }); p.castT = 0.4; }
+      if (sp === 'bike' || sp === 'weapon') { this.emit({ k: 'cast', id: p.id, sid: sp, kind: 'self', tg: [], c: CHARS[p.char].color, x: p.x, y: p.y, z: p.z, yw: p.yaw }); p.castSid = sp; p.castDur = 0.6; p.castT = 0.6; }
       if (sp === 'bike') { p.buffs.bike = 6; p.spCD = 70; this.emit({ k: 'txt', id: p.id, s: 'バイク召喚！', c: '#fb923c' }); this.emit({ k: 'sfx', n: 'bike' }); }
       if (sp === 'weapon') { if (p.item) this.dropItem(p); const w = ['ar', 'sr', 'sg'][p.input.sel % 3]; this.giveItem(p, w); p.spCD = 55; }
       if (sp === 'scythe') {
@@ -1161,7 +1163,7 @@ window.Sim = (function () {
           id: p.id, n: p.name, c: p.char, tm: p.team, x: r2(p.x), y: r2(p.y), z: r2(p.z), yw: r2(p.yaw), vy: r2(p.vy),
           h: Math.round(p.hero), l: p.lives, tp: p.tp, k: p.kills, tk: p.ticket, tkp: p.ticketProg,
           e: p.elim ? 1 : 0, rs: p.respawn > 0 ? r2(p.respawn) : 0, inv: p.inv > 0 ? 1 : 0, mi: p.minion ? 1 : 0, bot: p.bot ? 1 : 0,
-          gr: p.ground ? 1 : 0, pt: r2(p.punchT), ps: p.punchSide, ch: r2(p.charging), hd: r2(p.headT), gb: p.grab || 0, gby: p.grabbedBy || 0, cs: p.castT > 0 ? 1 : 0, ga: r2(p.grabAnim || 0), tw: p.throwAnim > 0 ? 1 : 0, tr: p.trail > 0 ? 1 : 0,
+          gr: p.ground ? 1 : 0, pt: r2(p.punchT), ps: p.punchSide, ch: r2(p.charging), hd: r2(p.headT), gb: p.grab || 0, gby: p.grabbedBy || 0, cs: p.castT > 0 ? p.castSid : 0, cq: p.castT > 0 ? r2(1 - p.castT / p.castDur) : 0, ga: r2(p.grabAnim || 0), tw: p.throwAnim > 0 ? 1 : 0, tr: p.trail > 0 ? 1 : 0,
           ld: p.ledge ? 1 : 0, sn: r2(p.stun), hs: p.hitstun > 0 ? 1 : 0, gd: p.guard ? 1 : 0, ds: p.dashT > 0 ? 1 : 0, sy: p.scy > 0 ? 1 : 0, cr: p.crouchT > 0 ? 1 : 0,
           st: Object.keys(p.st).map((k) => [k, r2(p.st[k].t), p.st[k].lv, p.st[k].dis || '']),
           bf: Object.keys(p.buffs).filter((k) => typeof p.buffs[k] === 'number' || k === 'ken').map((k) => [k, r2(typeof p.buffs[k] === 'number' ? p.buffs[k] : p.buffs[k].t), k === 'ken' ? p.buffs.ken.k : 0]),

@@ -729,35 +729,224 @@ window.Render = (function () {
     const T = '友情ブレイカーズ★スキル発動★'; for (let i = 0; i < T.length; i++) { const a = (i / T.length) * Math.PI * 2; g.save(); g.rotate(a); g.fillText(T[i], 0, -102); g.restore(); }
     const t = new THREE.CanvasTexture(c); return t;
   })();
-  // スキル発動：足元の魔法陣・光の柱・らせんの粒、狙った相手へ光線と着弾
+  // ---------- スキルごとのモーション ----------
+  // t: 0→1 の進み具合。返り値で腕の角度などを上書きする（x:前後 -1.6=前 -3=真上、z:横への開き）
+  const ease = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+  const pulse = (t, a, b) => (t < a || t > b ? 0 : Math.sin(((t - a) / (b - a)) * Math.PI));
+  function castPose(sid, t, now) {
+    const P = { la: 0, ra: 0, lz: 0.15, rz: -0.15, twist: 0, lean: 0, hop: 0, sq: 1, shake: 0, lr: 1, rr: 1 };
+    const w = Math.sin(now * 30), w2 = Math.sin(now * 14);
+    switch (sid) {
+      case 'modifier': case 'edit': // キーボードを高速で打つ
+        P.la = -1.05 + w * 0.25; P.ra = -1.05 - w * 0.25; P.lz = 0.35; P.rz = -0.35; P.lean = 0.25; P.hop = sid === 'edit' && t > 0.8 ? pulse(t, 0.8, 1) * 0.5 : 0; break;
+      case 'surume': // スルメをかじる
+        P.ra = -2.3 + Math.abs(w2) * 0.3; P.rz = 0.75; P.la = -0.3; P.sq = 1 - Math.abs(w2) * 0.06; P.lean = 0.1; break;
+      case 'kirinuki': // スマホで動画を見る
+        P.la = P.ra = -1.25; P.lz = 0.45; P.rz = -0.45; P.lean = 0.3; P.twist = Math.sin(now * 3) * 0.15; break;
+      case 'kichige': { // ためて…爆発
+        const charge = t < 0.45;
+        if (charge) { P.la = P.ra = 0.6; P.lz = 0.2; P.rz = -0.2; P.sq = 0.75; P.shake = 0.06; }
+        else { const k = ease((t - 0.45) / 0.2); P.la = P.ra = -3.0 * k; P.lz = -1.0 * k; P.rz = 1.0 * k; P.sq = 1 + 0.25 * pulse(t, 0.45, 0.8); P.hop = 0.6 * pulse(t, 0.45, 0.85); P.shake = 0.03; P.lean = -0.25; }
+        break;
+      }
+      case 'subaka': // 横を指して呼び出す
+        P.la = -1.4; P.lz = -1.0; P.ra = -0.5 + pulse(t, 0.1, 0.4) * -1.2; P.twist = 0.5; break;
+      case 'soundboard': // 片手でヘッドホン、片手でスクラッチ
+        P.la = -2.7; P.lz = 0.9; P.ra = -1.3; P.rz = -0.2 + Math.sin(now * 18) * 0.5; P.twist = Math.sin(now * 18) * 0.15; P.hop = Math.abs(Math.sin(now * 9)) * 0.12; break;
+      case 'role': // 相手をビシッと指さす
+        P.ra = -1.62; P.rr = 1 + 0.35 * ease(t / 0.3); P.la = -0.2; P.lz = 0.9; P.twist = -0.45; P.lean = 0.1; break;
+      case 'chudoku': // おいでおいで
+        P.la = -1.4 + Math.sin(now * 12) * 0.45; P.ra = -1.4 + Math.sin(now * 12 + 0.6) * 0.45; P.lz = -0.1; P.rz = 0.1; P.lean = -0.1; break;
+      case 'rasher': // ヘドバン
+        P.la = P.ra = -2.9; P.lz = -0.3; P.rz = 0.3; P.lean = Math.sin(now * 16) * 0.45; P.hop = Math.abs(Math.sin(now * 8)) * 0.15; break;
+      case 'rhythmrev': // くるっと回って踊る
+        P.la = -1.6; P.ra = -1.6; P.lz = -1.4; P.rz = 1.4; P.twist = t * Math.PI * 2 * 2; P.hop = Math.abs(Math.sin(t * Math.PI * 4)) * 0.3; break;
+      case 'goreisan': // 薬を飲む
+        P.ra = -2.5; P.rz = 0.7; P.la = -0.2; P.lean = -0.35 * ease(t / 0.4); break;
+      case 'mousou': // 手を組んでうっとり
+        P.la = -1.3; P.ra = -1.3; P.lz = 0.75; P.rz = -0.75; P.twist = Math.sin(now * 3) * 0.3; P.hop = 0.35 * ease(t / 0.4) + Math.sin(now * 4) * 0.06; P.lean = -0.15; break;
+      case 'rinri': // 頭を抱えて発狂
+        P.la = P.ra = -2.7; P.lz = 0.85; P.rz = -0.85; P.shake = t > 0.35 ? 0.09 : 0.02; P.twist = t > 0.35 ? Math.sin(now * 25) * 0.3 : 0; P.sq = 1 + Math.sin(now * 20) * 0.05; break;
+      case 'mic': // マイクを口元に→前へ突き出す
+        if (t < 0.4) { P.ra = -2.25; P.rz = 0.55; } else { P.ra = -1.6; P.rr = 1.35; P.lean = 0.25; }
+        P.la = -0.4; P.lz = 0.4; break;
+      case 'sniper': case 'snipe': // ひざをついて構える→反動
+        P.la = -1.6; P.ra = -1.55; P.lz = -0.35; P.rz = 0.1; P.sq = 0.78; P.lean = 0.15;
+        if (t > 0.55) { const r = pulse(t, 0.55, 0.85); P.lean = 0.15 - r * 0.5; P.la -= r * 0.5; P.ra -= r * 0.5; }
+        break;
+      case 'fish': { // 竿を振りかぶって投げる→釣り上げる
+        if (t < 0.35) { P.la = P.ra = -3.2 + ease(t / 0.35) * 0.0; P.lean = -0.3; }
+        else if (t < 0.6) { const k = ease((t - 0.35) / 0.25); P.la = P.ra = -3.2 + k * 2.1; P.lean = -0.3 + k * 0.5; }
+        else { const k = ease((t - 0.6) / 0.3); P.la = P.ra = -1.1 - k * 1.8; P.lean = 0.2 - k * 0.5; }
+        P.lz = -0.15; P.rz = 0.15; break;
+      }
+      case 'tenjou': // 天上天下唯我独尊のポーズ
+        P.ra = -3.1; P.rz = -0.05; P.la = 0.25; P.lz = -0.2; P.hop = 0.25 * ease(t / 0.3); P.sq = 1.08; break;
+      case 'build': { // ハンマーでトントン
+        const hit = Math.sin(now * 16); P.ra = -2.6 + (hit > 0 ? hit * 1.6 : 0); P.rz = 0.05; P.la = -1.3; P.lz = 0.3; P.lean = 0.35; P.sq = 0.92; break;
+      }
+      case 'mt': // 大ジャンプしてメカへ
+        P.la = P.ra = -3.0; P.lz = -0.6; P.rz = 0.6; P.hop = 1.6 * Math.sin(Math.min(1, t) * Math.PI); P.twist = t * Math.PI * 2; break;
+      case 'sherpa': // 空から来た荷物を受け取る
+        P.la = P.ra = -3.0; P.lz = 0.25; P.rz = -0.25; P.sq = t > 0.55 ? 1 - pulse(t, 0.55, 0.8) * 0.25 : 1; P.lean = -0.1; break;
+      case 'muku': // 手を合わせて首をかしげる
+        P.la = -1.5; P.ra = -1.5; P.lz = 0.8; P.rz = -0.8; P.twist = 0.25; P.hop = Math.abs(Math.sin(t * Math.PI * 2)) * 0.25; P.lean = 0.12; break;
+      case 'positive': // ガッツポーズで大ジャンプ
+        P.ra = -3.1; P.rz = -0.1; P.la = 0.2 + (t > 0.3 ? -1.0 : 0); P.lz = 0.4; P.hop = 0.9 * pulse(t, 0.2, 0.75); P.sq = t < 0.2 ? 0.8 : 1.1; break;
+      case 'bike': // 前へ乗り出す
+        P.la = P.ra = -1.5; P.lean = 0.45; P.hop = 0.4 * pulse(t, 0, 0.5); break;
+      case 'weapon': // 背中から武器を引き抜く
+        P.ra = t < 0.4 ? -3.2 : -1.5; P.rz = t < 0.4 ? 0.4 : -0.1; P.la = -0.5; P.twist = t < 0.4 ? -0.4 : 0.2; break;
+      default:
+        P.la = P.ra = -2.9; P.lz = -0.45; P.rz = 0.45;
+    }
+    return P;
+  }
+  // ---------- スキルごとの演出 ----------
+  function iconSprite(txt, col, size = 0.9) {
+    const c = document.createElement('canvas'); c.width = c.height = 96; const g = c.getContext('2d');
+    g.font = '900 72px "Noto Sans JP", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 9; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(txt, 48, 52); g.fillStyle = col; g.fillText(txt, 48, 52);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); sp.scale.setScalar(size); return sp;
+  }
+  // 記号が相手へ飛んでいく
+  function flyIcons(from, to, txt, col, n = 3, dur = 0.55) {
+    for (let i = 0; i < n; i++) {
+      const sp = iconSprite(typeof txt === 'function' ? txt(i) : txt, typeof col === 'function' ? col(i) : col, 0.7);
+      const A = new THREE.Vector3(...from), B = new THREE.Vector3(...to), mid = A.clone().lerp(B, 0.5); mid.y += 1.5 + Math.random();
+      const off = (Math.random() - 0.5) * 0.12;
+      addFx(sp, dur + i * 0.08, (f, k) => { const u = Math.min(1, (1 - k) * (1 + i * 0.15) + off); const a = A.clone().lerp(mid, u), b = mid.clone().lerp(B, u); sp.position.copy(a.lerp(b, u)); sp.material.opacity = Math.min(1, k * 3); });
+    }
+  }
+  function ringPulse(x, y, z, col, r0, r1, life, vertical, yw) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40), addB(col, 0.9));
+    m.position.set(x, y, z); if (vertical) { m.rotation.y = yw || 0; } else m.rotation.x = -Math.PI / 2;
+    addFx(m, life, (f, k) => { m.scale.setScalar(r0 + (r1 - r0) * (1 - k)); m.material.opacity = k * 0.9; });
+  }
+  function riseParts(x, y, z, n, txtOrCol, life = 1.0, spread = 0.9) {
+    for (let i = 0; i < n; i++) {
+      const isTxt = typeof txtOrCol === 'string' && txtOrCol.length <= 2;
+      const o = isTxt ? iconSprite(txtOrCol, '#ffffff', 0.5) : new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), addB(txtOrCol, 0.9));
+      const ox = (Math.random() - 0.5) * spread * 2, oz = (Math.random() - 0.5) * spread * 2, sp = 1.5 + Math.random() * 2, dl = Math.random() * 0.3;
+      addFx(o, life + dl, (f, k) => { const t = 1 - k; o.position.set(x + ox + Math.sin(t * 8 + i) * 0.15, y + t * sp * life, z + oz); (o.material).opacity = Math.min(1, k * 2); });
+    }
+  }
+  // 手に一時的に持つ小道具
+  function handProp(ch, kind, life) {
+    let g = new THREE.Group();
+    const dark = toon(0x1c1a24);
+    if (kind === 'keyboard') { M(new THREE.BoxGeometry(0.9, 0.06, 0.32), dark, 0, 0, 0, g); for (let i = 0; i < 12; i++) M(new THREE.BoxGeometry(0.11, 0.04, 0.09), addB([0xff4d6d, 0x22d3ee, 0xa3e635, 0xfacc15][i % 4], 1), -0.37 + (i % 6) * 0.15, 0.045, -0.06 + ((i / 6) | 0) * 0.12, g); g.position.set(0, 0.95, 0.75); ch.inner.add(g); }
+    else if (kind === 'squid') { const b = M(new THREE.ConeGeometry(0.14, 0.45, 8), toon(0xe8c9a0), 0, 0, 0, g); b.rotation.x = Math.PI; for (let i = 0; i < 5; i++) { const t = M(new THREE.CylinderGeometry(0.02, 0.01, 0.3, 4), toon(0xd9b48a), -0.1 + i * 0.05, -0.35, 0, g); t.rotation.z = (i - 2) * 0.15; } g.position.set(0, -0.15, 0.05); ch.arms[1].f.add(g); }
+    else if (kind === 'phone') { M(new THREE.BoxGeometry(0.42, 0.26, 0.03), dark, 0, 0, 0, g); M(new THREE.PlaneGeometry(0.38, 0.22), new THREE.MeshBasicMaterial({ color: 0x7dd3fc }), 0, 0, -0.02, g).rotation.y = Math.PI; g.position.set(0, 1.25, 0.6); g.rotation.x = 0.35; ch.inner.add(g); }
+    else if (kind === 'mic') { const st = M(new THREE.CylinderGeometry(0.035, 0.03, 0.3, 8), dark, 0, -0.15, 0.05, g); M(new THREE.SphereGeometry(0.08, 10, 8), toon(0x9ca3af), 0, -0.32, 0.05, g); ch.arms[1].f.add(g); }
+    else if (kind === 'rod') { rod([0, 0, 0], [0, -1.8, 0.4], 0.025, toon(0x8b5a2b), g); M(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 10), toon(0x1c1a24), 0, -0.2, 0.06, g).rotation.z = Math.PI / 2; ch.arms[1].f.add(g); }
+    else if (kind === 'hammer') { rod([0, 0, 0], [0, -0.5, 0.05], 0.03, toon(0x8b5a2b), g); const h = M(new THREE.BoxGeometry(0.28, 0.14, 0.14), toon(0x6b7280), 0, -0.55, 0.05, g); ol(h, 1.1); ch.arms[1].f.add(g); }
+    else if (kind === 'medicine') { M(new THREE.BoxGeometry(0.14, 0.2, 0.04), toon(0x15803d), 0, -0.15, 0.08, g); ch.arms[1].f.add(g); }
+    else if (kind === 'flag') { rod([0, 0, 0], [0, -0.9, 0], 0.02, toon(0xe5e7eb), g); M(new THREE.PlaneGeometry(0.4, 0.26), new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide }), 0.2, -0.78, 0, g); ch.arms[1].f.add(g); }
+    else return;
+    let left = life;
+    addFx(new THREE.Group(), life, (f) => { if (f.life <= 0.02 && g.parent) { g.parent.remove(g); disposeFx(g); } });
+  }
+  function charPos(ch, e) { return ch ? ch.root.position.clone() : new THREE.Vector3(e.x, e.y, e.z); }
   function castFx(e) {
     const ch = chars.get(e.id);
-    const x = ch ? ch.root.position.x : e.x, y = ch ? ch.root.position.y : e.y, z = ch ? ch.root.position.z : e.z;
+    const P = charPos(ch, e), x = P.x, y = P.y, z = P.z, yw = ch ? ch.root.rotation.y : e.yw;
+    const fx = Math.sin(yw), fz = Math.cos(yw);
     const col = new THREE.Color(e.c).lerp(new THREE.Color(0xffffff), 0.25).getHex();
-    const mc = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: circleTex, color: col, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    mc.rotation.x = -Math.PI / 2; mc.position.set(x, y + 0.06, z);
-    addFx(mc, 0.9, (f, k, dt) => { mc.rotation.z += dt * 3; const s = k > 0.8 ? (1 - k) / 0.2 : 1; mc.scale.setScalar(0.3 + s * 0.9 + (1 - k) * 0.3); mc.material.opacity = Math.min(1, k * 1.6); });
-    const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 5, 20, 1, true), addB(col, 0.5)); pil.position.set(x, y + 2.5, z);
-    addFx(pil, 0.55, (f, k) => { pil.material.opacity = k * 0.5; pil.scale.set(0.4 + (1 - k), 1, 0.4 + (1 - k)); });
-    spark(x, y + 1.2, z, 0.9, col);
-    for (let i = 0; i < 14; i++) {
-      const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), addB(i % 2 ? col : 0xffffff, 1));
-      const a0 = (i / 14) * Math.PI * 2, r0 = 1.1;
-      addFx(m, 0.8, (f, k) => { const t = 1 - k, a = a0 + t * 6; m.position.set(x + Math.cos(a) * r0 * (1 - t * 0.5), y + 0.2 + t * 3.2, z + Math.sin(a) * r0 * (1 - t * 0.5)); m.material.opacity = k; });
+    const tgs = (e.tg || []).map((id) => chars.get(id)).filter(Boolean).map((c) => [c.root.position.x, c.root.position.y + 1.1, c.root.position.z]);
+    const me = [x, y + 1.3, z];
+    const hitAll = (delay, c2, txt) => tgs.forEach((b, i) => later(delay + i * 0.05, () => { spark(b[0], b[1], b[2], 0.7, c2); if (txt) floatText(b[0], b[1] + 1.2, b[2], txt, '#' + new THREE.Color(c2).getHexString(), false); }));
+    switch (e.sid) {
+      case 'modifier':
+        handProp(ch, 'keyboard', 0.9);
+        later(0.35, () => { const S = ['?', '!', '★', '♪', '×', '♥']; const C = ['#f472b6', '#fde047', '#4ade80', '#60a5fa', '#f97316', '#c084fc']; tgs.forEach((b) => flyIcons(me, b, (i) => S[(Math.random() * S.length) | 0], (i) => C[(Math.random() * C.length) | 0], 3)); hitAll(0.5, 0xc084fc); });
+        riseParts(x, y + 1.0, z, 8, 0xc084fc, 0.8, 0.7); break;
+      case 'edit':
+        handProp(ch, 'keyboard', 1.0);
+        { const film = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.16, 4, 40), new THREE.MeshBasicMaterial({ color: 0x111111 })); film.position.set(x, y + 1.1, z); film.rotation.x = Math.PI / 2;
+          for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; M(new THREE.BoxGeometry(0.14, 0.04, 0.1), addB(0xffffff, 0.9), Math.cos(a) * 1.4, Math.sin(a) * 1.4, 0.13, film); }
+          addFx(film, 1.0, (f, k) => { film.rotation.z += 0.12; film.scale.setScalar(0.6 + (1 - k) * 0.6); }); }
+        later(0.7, () => { tgs.forEach((b) => { zap(me, b, 0xf43f5e); floatText(b[0], b[1] + 1.2, b[2], 'カット！', '#f43f5e', false); }); hitAll(0.05, 0xf43f5e); }); break;
+      case 'surume':
+        handProp(ch, 'squid', 1.1); for (let i = 0; i < 3; i++) later(0.2 + i * 0.3, () => floatText(x, y + 2.3, z, 'もぐもぐ', '#e8c9a0', false)); break;
+      case 'kirinuki':
+        handProp(ch, 'phone', 1.0); later(0.5, () => floatText(x + fx * 0.5, y + 2.4, z + fz * 0.5, 'それってあなたの感想ですよね', '#93c5fd', false)); break;
+      case 'kichige':
+        for (let i = 0; i < 10; i++) later(i * 0.04, () => { const a = Math.random() * 6.28; const m = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), addB(0xff3b3b, 1)); const r = 1.6; addFx(m, 0.35, (f, k) => { const u = 1 - k; m.position.set(x + Math.cos(a) * r * (1 - u), y + 0.8, z + Math.sin(a) * r * (1 - u)); }); });
+        later(0.45, () => { for (let i = 0; i < 3; i++) later(i * 0.1, () => ringPulse(x, y + 0.2 + i * 0.6, z, i % 2 ? 0xffb020 : 0xff3b3b, 0.5, 10, 0.6)); for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; const sp = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.6, 6), addB(0xff5a2a, 0.9)); sp.position.set(x + Math.cos(a) * 1.4, y + 0.8, z + Math.sin(a) * 1.4); addFx(sp, 0.5, (f, k) => { sp.scale.set(1, 0.3 + (1 - k) * 1.2, 1); sp.material.opacity = k; }); } floatText(x, y + 2.8, z, 'うおおおお！！', '#ff3b3b', true); }); break;
+      case 'subaka':
+        later(0.3, () => { const cx = x - fz * 1.0 + -fx * 0.6, cz = z + fx * 1.0 - fz * 0.6; for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), addB(0xfda4af, 0.7)); const a = Math.random() * 6.28; addFx(m, 0.6, (f, k) => { m.position.set(cx + Math.cos(a) * (1 - k) * 0.9, y + 0.5 + (1 - k) * 0.6, cz + Math.sin(a) * (1 - k) * 0.9); m.material.opacity = k * 0.7; }); } riseParts(cx, y + 0.8, cz, 6, '♥', 1.0, 0.5); floatText(cx, y + 2.2, cz, 'ポンッ！', '#fda4af', false); }); break;
+      case 'soundboard':
+        for (let i = 0; i < 5; i++) later(i * 0.15, () => ringPulse(x, y + 1.0, z, 0xa855f7, 0.4, 6, 0.5));
+        tgs.forEach((b) => flyIcons(me, b, (i) => ['♪', '♫', '♬'][i % 3], '#c084fc', 4)); hitAll(0.6, 0xa855f7, 'ザザッ'); break;
+      case 'role':
+        later(0.25, () => tgs.forEach((b) => { zap(me, b, 0xfacc15); const tag = iconSprite('役', '#facc15', 1.0); const A = new THREE.Vector3(...me), B = new THREE.Vector3(...b); addFx(tag, 0.5, (f, k) => { tag.position.copy(A.clone().lerp(B, Math.min(1, (1 - k) * 1.6))); tag.position.y += 0.5; }); })); hitAll(0.5, 0xfacc15); break;
+      case 'chudoku':
+        tgs.forEach((b) => flyIcons(b, me, (i) => ['G', 'A', 'M', 'E'][i % 4], '#4ade80', 4, 0.8));
+        later(0.1, () => tgs.forEach((b) => { const m = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 24), addB(0x22c55e, 0.9)); m.position.set(b[0], b[1], b[2]); m.rotation.x = Math.PI / 2; addFx(m, 0.8, (f, k) => { m.rotation.z += 0.2; m.scale.setScalar(0.5 + k); m.material.opacity = k; }); })); break;
+      case 'rasher':
+        for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; const bar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1, 0.18), addB([0x22d3ee, 0xa855f7, 0xf472b6][i % 3], 0.9)); bar.position.set(x + Math.cos(a) * 1.5, y, z + Math.sin(a) * 1.5); addFx(bar, 1.0, (f, k, dt) => { const h = 0.3 + Math.abs(Math.sin(performance.now() / 90 + i)) * 1.8; bar.scale.y = h * k; bar.position.y = y + h * k / 2; }); }
+        riseParts(x, y + 1.5, z, 6, '♪', 1.0, 0.6); break;
+      case 'rhythmrev':
+        for (let i = 0; i < 4; i++) later(i * 0.24, () => { ringPulse(x, y + 0.1, z, [0xf43f5e, 0x22d3ee, 0xfacc15, 0x4ade80][i], 0.3, 3.5, 0.4); floatText(x + (Math.random() - 0.5) * 2, y + 2.2, z + (Math.random() - 0.5) * 2, ['←', '↑', '↓', '→'][i], '#fff', true); }); break;
+      case 'goreisan':
+        handProp(ch, 'medicine', 1.0); later(0.4, () => { riseParts(x, y + 0.4, z, 16, 0x86efac, 1.0, 0.8); ringPulse(x, y + 0.1, z, 0x4ade80, 0.5, 2.4, 0.6); floatText(x, y + 2.5, z, 'ゴクッ', '#86efac', false); }); break;
+      case 'mousou': {
+        const cloud = new THREE.Group(); for (let i = 0; i < 5; i++) M(new THREE.SphereGeometry(0.35 + (i % 2) * 0.1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }), (i - 2) * 0.32, Math.sin(i) * 0.12, 0, cloud);
+        for (let i = 0; i < 3; i++) M(new THREE.SphereGeometry(0.08 + i * 0.04, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }), 0.3 - i * 0.1, -0.5 - i * 0.25, 0, cloud).position.set(0.3 - i * 0.12, -0.45 - i * 0.22, 0);
+        const ic = iconSprite('♥', '#fb7185', 0.5); ic.position.set(0, 0.05, 0.4); cloud.add(ic);
+        cloud.position.set(x, y + 3.0, z); addFx(cloud, 1.1, (f, k) => { cloud.scale.setScalar(Math.min(1, (1 - k) * 4)); cloud.position.y = y + 3.0 + Math.sin(performance.now() / 300) * 0.1; cloud.quaternion.copy(camera.quaternion); });
+        riseParts(x, y + 2.0, z, 6, '★', 1.0, 0.7); break;
+      }
+      case 'rinri': {
+        const sw = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.06, 6, 40, Math.PI * 1.6), addB(0x8b5cf6, 0.95)); sw.position.set(x, y + 1.9, z); sw.rotation.x = Math.PI / 2;
+        addFx(sw, 1.0, (f, k) => { sw.rotation.z += 0.35; sw.scale.setScalar(0.6 + Math.sin(performance.now() / 80) * 0.15 + (1 - k) * 0.4); sw.material.opacity = k; });
+        for (let i = 0; i < 3; i++) later(0.3 + i * 0.2, () => floatText(x + (Math.random() - 0.5), y + 2.6, z, ['？！', 'SAN値ﾁｪｯｸ', 'ｱﾜﾜ'][i], '#c4b5fd', false)); break;
+      }
+      case 'mic':
+        handProp(ch, 'mic', 0.9);
+        later(0.4, () => { for (let i = 0; i < 4; i++) later(i * 0.08, () => { const a = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 24, 1, -0.7, 1.4), addB(0xc4b5fd, 0.9)); a.position.set(x + fx * (0.8 + i * 0.6), y + 1.2, z + fz * (0.8 + i * 0.6)); a.rotation.set(0, yw - Math.PI / 2, 0); addFx(a, 0.4, (f, k) => { a.scale.setScalar(1 + (1 - k) * 1.5 + i * 0.4); a.material.opacity = k; }); }); hitAll(0.2, 0xc4b5fd); }); break;
+      case 'sniper': case 'snipe': {
+        const tg2 = e.sid === 'snipe' ? tgs : tgs;
+        tg2.forEach((b) => { const ln = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 4), addB(0xff2244, 0.8)); const A = new THREE.Vector3(...me), B = new THREE.Vector3(...b), d = B.clone().sub(A); ln.position.copy(A).addScaledVector(d, 0.5); ln.scale.y = d.length(); ln.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); addFx(ln, 0.6, (f, k) => (ln.material.opacity = 0.3 + 0.5 * Math.abs(Math.sin(performance.now() / 50))));
+          const cr = iconSprite('⊕', '#ff2244', 1.1); cr.position.set(b[0], b[1], b[2]); addFx(cr, 0.6, (f, k) => { cr.scale.setScalar(0.6 + k * 1.2); }); });
+        later(0.58, () => { spark(x + fx * 1.1, y + 1.3, z + fz * 1.1, 1.0, 0xffd166); floatText(x, y + 2.6, z, 'バァン！', '#ff2244', false); tgs.forEach((b) => beam(me, b, 0xffd166, true)); hitAll(0.02, 0xff2244); });
+        break;
+      }
+      case 'fish':
+        handProp(ch, 'rod', 1.1);
+        later(0.5, () => tgs.forEach((b) => { const A = new THREE.Vector3(x + fx * 1.5, y + 2.6, z + fz * 1.5), B = new THREE.Vector3(...b); const curve = new THREE.QuadraticBezierCurve3(A, A.clone().lerp(B, 0.5).add(new THREE.Vector3(0, 2.5, 0)), B); const ln = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.012, 3, false), addB(0xe0f2fe, 0.9)); addFx(ln, 0.6, (f, k) => (ln.material.opacity = k)); later(0.2, () => { for (let i = 0; i < 8; i++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), addB(0x38bdf8, 0.9)); const v = new THREE.Vector3((Math.random() - 0.5) * 3, 3 + Math.random() * 2, (Math.random() - 0.5) * 3); d.position.set(b[0], b[1] - 0.8, b[2]); addFx(d, 0.6, (f, k, dt) => { d.position.addScaledVector(v, dt); v.y -= 12 * dt; }); } }); })); break;
+      case 'tenjou': {
+        const halo = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 40), addB(0xfde047, 0.95)); halo.position.set(x - fx * 0.3, y + 2.0, z - fz * 0.3); halo.rotation.y = yw;
+        const rays = new THREE.Group(); for (let i = 0; i < 12; i++) { const r = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 1.6), addB(0xfff7c2, 0.6)); r.rotation.z = (i / 12) * Math.PI * 2; r.position.set(Math.sin(-r.rotation.z) * 1.3, Math.cos(r.rotation.z) * 1.3, 0); rays.add(r); } halo.add(rays);
+        addFx(halo, 1.1, (f, k) => { rays.rotation.z += 0.02; halo.scale.setScalar(Math.min(1, (1 - k) * 4)); halo.material.opacity = k; rays.children.forEach((r) => (r.material.opacity = k * 0.6)); });
+        later(0.3, () => floatText(x, y + 3.2, z, '天上天下唯我独尊', '#fde047', true)); later(0.6, () => tgs.forEach((b) => zap(me, b, 0xfde047))); hitAll(0.65, 0xfde047); break;
+      }
+      case 'build':
+        handProp(ch, 'hammer', 1.1);
+        for (let i = 0; i < 4; i++) later(0.15 + i * 0.22, () => { const px = x + fx * 0.9, pz = z + fz * 0.9; spark(px, y + 0.3, pz, 0.3, 0xfde68a); floatText(px, y + 1.6, pz, 'トン', '#fde68a', false); for (let j = 0; j < 3; j++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 0.14), toon(0xc08a52)); const v = new THREE.Vector3((Math.random() - 0.5) * 3, 3 + Math.random() * 2, (Math.random() - 0.5) * 3); pl.position.set(px, y + 0.3, pz); addFx(pl, 0.6, (f, k, dt) => { pl.position.addScaledVector(v, dt); v.y -= 12 * dt; pl.rotation.x += dt * 8; }); } }); break;
+      case 'mt':
+        for (let i = 0; i < 10; i++) { const pn = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.05), std(0x9ca3af, { m: 0.8, r: 0.3 })); const a = (i / 10) * Math.PI * 2, r0 = 3.5; addFx(pn, 0.8, (f, k) => { const u = 1 - k; pn.position.set(x + Math.cos(a + u * 3) * r0 * k, y + 1 + k * 2, z + Math.sin(a + u * 3) * r0 * k); pn.rotation.y += 0.3; }); }
+        later(0.75, () => { spark(x, y + 1.5, z, 1.2, 0x67e8f9); ringPulse(x, y + 0.1, z, 0x67e8f9, 0.5, 4, 0.5); floatText(x, y + 3.2, z, 'ガシャーン！', '#67e8f9', true); }); break;
+      case 'sherpa': {
+        const box = new THREE.Group(); const cr = M(new THREE.BoxGeometry(0.6, 0.5, 0.6), toon(0xc08a52), 0, 0, 0, box); ol(cr, 1.05); M(new THREE.BoxGeometry(0.62, 0.1, 0.62), toon(0x16a34a), 0, 0, 0, box);
+        const chute = M(new THREE.SphereGeometry(0.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf97316, side: THREE.DoubleSide }), 0, 1.4, 0, box); for (const [a, b] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) rod([a * 0.3, 0.25, b * 0.3], [a, 1.4, b], 0.01, toon(0xffffff), box);
+        addFx(box, 0.75, (f, k) => { box.position.set(x, y + 2.2 + k * 8, z); box.rotation.y += 0.05; });
+        later(0.72, () => { riseParts(x, y + 1.5, z, 14, 0x86efac, 0.8, 0.8); floatText(x, y + 3, z, '補給！', '#86efac', true); }); break;
+      }
+      case 'muku':
+        riseParts(x, y + 1.2, z, 6, '♥', 1.0, 0.6);
+        later(0.3, () => tgs.forEach((b) => { for (let i = 0; i < 6; i++) { const pe = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), toon(0x3b2416)); const A = new THREE.Vector3(...me), B = new THREE.Vector3(b[0] + (Math.random() - 0.5) * 0.6, b[1] + (Math.random() - 0.5) * 0.6, b[2]); const mid = A.clone().lerp(B, 0.5); mid.y += 1.5; addFx(pe, 0.5 + i * 0.04, (f, k) => { const u = 1 - k; pe.position.copy(A.clone().lerp(mid, u).lerp(mid.clone().lerp(B, u), u)); }); } })); hitAll(0.85, 0xfbcfe8, 'タピオカパン'); break;
+      case 'positive':
+        handProp(ch, 'flag', 1.0);
+        later(0.3, () => { const sun = new THREE.Group(); for (let i = 0; i < 16; i++) { const r = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 2.2), addB(0xfde047, 0.7)); r.rotation.z = (i / 16) * Math.PI * 2; sun.add(r); } sun.position.set(x, y + 1.6, z); addFx(sun, 0.7, (f, k) => { sun.quaternion.copy(camera.quaternion); sun.rotateZ((1 - k) * 2); sun.scale.setScalar(0.5 + (1 - k) * 1.5); sun.children.forEach((r) => (r.material.opacity = k * 0.7)); }); riseParts(x, y + 0.5, z, 6, '↑', 1.0, 0.7); floatText(x, y + 3, z, 'いける！！', '#fde047', true); }); break;
+      case 'bike':
+        later(0.15, () => { for (let i = 0; i < 10; i++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshBasicMaterial({ color: 0xd6d3d1, transparent: true, opacity: 0.7 })); const a = Math.random() * 6.28; addFx(d, 0.6, (f, k) => { d.position.set(x - fx * 0.8 + Math.cos(a) * (1 - k) * 1.2, y + 0.3 + (1 - k) * 0.4, z - fz * 0.8 + Math.sin(a) * (1 - k) * 1.2); d.material.opacity = k * 0.7; }); } floatText(x, y + 2.6, z, 'ブーン！', '#fb923c', false); }); break;
+      case 'weapon':
+        later(0.25, () => { spark(x, y + 2.0, z, 0.8, 0xfacc15); ringPulse(x, y + 1.4, z, 0xfacc15, 0.3, 1.6, 0.35, true, yw); floatText(x, y + 2.8, z, 'チャキッ', '#facc15', false); }); break;
+      default:
+        spark(x, y + 1.2, z, 0.9, col);
     }
-    if (e.kind === 'self') { const rg = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.07, 6, 30), addB(col, 0.9)); rg.rotation.x = Math.PI / 2; rg.position.set(x, y + 0.2, z); addFx(rg, 0.6, (f, k) => { rg.position.y = y + 0.2 + (1 - k) * 2.4; rg.scale.setScalar(1 + (1 - k) * 0.6); rg.material.opacity = k; }); }
-    if (e.kind === 'aoe') wave(x, y + 0.15, z, 9, col);
-    // 狙った相手へ
-    (e.tg || []).forEach((tid, i) => {
-      const tc = chars.get(tid); if (!tc) return;
-      const a = [x, y + 1.3, z], b = [tc.root.position.x, tc.root.position.y + 1.1, tc.root.position.z];
-      later(0.12 + i * 0.05, () => {
-        zap(a, b, col);
-        spark(b[0], b[1], b[2], 0.8, col);
-        const st = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.55, 5, 1), addB(0xffffff, 0.95)); st.position.set(b[0], b[1], b[2]); st.lookAt(camera.position);
-        addFx(st, 0.35, (f, k) => { st.scale.setScalar(1 + (1 - k) * 2.2); st.rotation.z += 0.2; st.material.opacity = k; });
-      });
-    });
   }
   // 演出の時間で少し後に実行（録画でもずれない）
   function later(sec, fn) { let done = false; addFx(new THREE.Group(), sec, (f) => { if (!done && f.life <= 0.02) { done = true; fn(); } }); }
@@ -1161,12 +1350,13 @@ window.Render = (function () {
     if (p.ga > 0 && !p.tw) { la = ra = -1.6; lz = -0.25; rz = 0.25; grabReach = 1 + 0.45 * Math.sin(Math.min(1, p.ga / 0.28) * Math.PI); }
     // 投げ：両腕を頭上から振り下ろす
     if (p.tw) { la = ra = -2.6 + (1 - Math.min(1, p.ga / 0.35)) * 1.6; lz = -0.1; rz = 0.1; }
-    // スキル発動：両腕を上げる
-    if (p.cs && !p.pt && !p.gb) { la = ra = -2.9; lz = -0.45; rz = 0.45; }
+    // スキル発動：スキルごとのモーション
+    let CP = null;
+    if (p.cs && !p.pt && !p.gb && !p.sn && !p.gby) { CP = castPose(p.cs, p.cq || 0, now); la = CP.la; ra = CP.ra; lz = CP.lz; rz = CP.rz; }
     if (p.ld) { la = ra = -3.0; lz = rz = 0; }
     if (p.ch > 0.35) { if (p.ps) la = 0.8; else ra = 0.8; }
     // パンチ：引く → 体をひねって突き出す（腕が伸びる） → 戻す
-    let twist = 0, reach = 1, lean = 0, fistS = 1, punching = false;
+    let twist = CP ? CP.twist : 0, reach = 1, lean = CP ? CP.lean : 0, fistS = 1, punching = false;
     if (p.pt > 0) {
       punching = true;
       const dur = p.pt > 0.25 || ch.lastCharged ? 0.3 : 0.25, t = Math.min(1, 1 - p.pt / dur);
@@ -1184,10 +1374,13 @@ window.Render = (function () {
     const armK = Math.min(1, dt * (punching ? 40 : 22));
     L.piv.rotation.x += (la - L.piv.rotation.x) * armK; Rr.piv.rotation.x += (ra - Rr.piv.rotation.x) * armK;
     const pa = p.ps ? L : Rr, oa = p.ps ? Rr : L;
-    const oReach = grabReach > 1 ? grabReach : 1; if (grabReach > 1) reach = grabReach;
+    let oReach = grabReach > 1 ? grabReach : 1; if (grabReach > 1) reach = grabReach;
+    if (CP) { if (pa === Rr) { reach = CP.rr; oReach = CP.lr; } else { reach = CP.lr; oReach = CP.rr; } }
     pa.piv.scale.y += (reach - pa.piv.scale.y) * armK; oa.piv.scale.y += (oReach - oa.piv.scale.y) * armK;
     pa.f.scale.setScalar(pa.f.scale.x + (fistS - pa.f.scale.x) * armK); oa.f.scale.setScalar(oa.f.scale.x + (1 - oa.f.scale.x) * armK);
-    ch.inner.rotation.y += (twist - ch.inner.rotation.y) * Math.min(1, dt * (punching ? 30 : 12));
+    if (CP && Math.abs(CP.twist) > 1.2) ch.inner.rotation.y = CP.twist; // 回転は直接
+    else ch.inner.rotation.y += (twist - ch.inner.rotation.y) * Math.min(1, dt * (punching ? 30 : 12));
+    if (CP) { R.position.y += CP.hop; ch.inner.scale.y *= CP.sq; if (CP.shake) { R.position.x += (Math.random() - 0.5) * CP.shake * 2; R.position.z += (Math.random() - 0.5) * CP.shake * 2; } }
     ch.inner.rotation.x += lean;
     L.piv.rotation.z += (lz - L.piv.rotation.z) * Math.min(1, dt * 15); Rr.piv.rotation.z += (rz - Rr.piv.rotation.z) * Math.min(1, dt * 15);
     // 頭突き
@@ -1253,7 +1446,7 @@ window.Render = (function () {
     else if (p.h >= 100) emi.setRGB(Math.min(0.4, 0.1 + p.h / 1000) + Math.sin(now * 12) * 0.1, 0.03, 0);
     else emi.setRGB(0, 0, 0);
     if (s.bo) emi.add(new THREE.Color(0.05, 0.05, 0.08));
-    if (p.cs) emi.add(new THREE.Color(0.22 + Math.sin(now * 30) * 0.08, 0.22, 0.18));
+    if (p.cs) emi.add(new THREE.Color(0.1, 0.1, 0.08));
     R.visible = !(p.inv && Math.sin(now * 30) > 0.5);
     if (has('lag') && Math.random() < 0.04) R.position.x += (Math.random() - 0.5) * 0.6;
     // チームの輪
