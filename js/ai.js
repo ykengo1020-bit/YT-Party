@@ -111,7 +111,7 @@ window.AI = (function () {
     const ahead = (mx || mz) ? groundAt(g, ax, az, p.y) : true;
     if ((mx || mz) && !ahead) {
       let far = null, farD = 0;
-      for (const fd of [3.0, 3.8, 4.6, 5.4]) { const f = groundAt(g, p.x + mx * fd, p.z + mz * fd, p.y + 1.8); if (f && f.top <= p.y + 1.8) { far = f; farD = fd; break; } }
+      for (const fd of [3.0, 3.8, 4.6, 5.4, 6.2, 7.0]) { const f = groundAt(g, p.x + mx * fd, p.z + mz * fd, p.y + 1.8); if (f && f.top <= p.y + 1.8) { far = f; farD = fd; break; } }
       if (far && p.ground && !p.grab) {
         // 隙間をジャンプで越える（遠い・高いときは二段ジャンプ）
         if (len2(gx - p.x, gz - p.z) > 2.5 || A.goMars || A.itemGoal) { press(inp, 'jump'); A.gapJ = farD > 3.9 || far.top > p.y + 0.9; A.cross = { mx, mz, t: 1.4 }; A.crossY = p.y; }

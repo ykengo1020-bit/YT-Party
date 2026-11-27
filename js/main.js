@@ -268,7 +268,7 @@
   function pushLobby() { if (S.role === 'host') Net.broadcast({ t: 'lobby', L: lobbyPublic() }); }
   function lobbyPublic() {
     const L = S.lobby; fixTeams();
-    return { members: L.members.map((m) => ({ key: m.key, name: m.name, char: m.char, team: m.team | 0 })), lives: L.lives, cpu: L.cpu, lvl: L.lvl, mode: L.mode, teams: L.teams, ff: L.ff, cpuTeams: L.cpuTeams, items: L.items, itemRate: L.itemRate, playing: S.mode === 'game' && !S.ended };
+    return { members: L.members.map((m) => ({ key: m.key, name: m.name, char: m.char, team: m.team | 0 })), lives: L.lives, rules: L.rules, cpu: L.cpu, lvl: L.lvl, mode: L.mode, teams: L.teams, ff: L.ff, cpuTeams: L.cpuTeams, items: L.items, itemRate: L.itemRate, playing: S.mode === 'game' && !S.ended };
   }
   // チーム：人数が少ないチームへ自動で入れる。範囲外のチームは直す
   function cpuCount() { const L = S.lobby; return Math.max(0, Math.min(L.cpu, 8 - L.members.length)); }
@@ -321,22 +321,112 @@
     }));
     const modeTxt = team ? `チーム戦（${L.teams}チーム・味方への攻撃${L.ff ? 'あり' : 'なし'}）` : '個人戦';
     $('lbNote').textContent = S.role === 'client'
-      ? (L.playing ? '今は試合中です。終わったら次の試合から一緒に遊べます' : `ホストのスタート待ち… ${modeTxt}・ライフ${L.lives}${team ? '・自分のカードをクリックでチーム変更' : ''}`)
+      ? (L.playing ? '今は試合中です。終わったら次の試合から一緒に遊べます' : `ホストのスタート待ち… ${modeTxt}${team ? '・自分のカードをクリックでチーム変更' : ''}`)
       : S.role === 'host' ? `参加者 ${L.members.length}人 ／ 最大8人（CPU含む）　${modeTxt}${team ? '・カードをクリックでチーム変更' : ''}` : (team ? 'カードをクリックでチーム変更' : '');
-    ['segLives', 'segCpu', 'segLvl', 'segMode', 'segTeams', 'segFF', 'segRate'].forEach((id, i) => { const v = [L.lives, L.cpu, L.lvl, L.mode, L.teams, L.ff, L.itemRate][i]; $(id).querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.v === v)); });
-    // 出るアイテム
-    $('itemToggles').innerHTML = GD.SPAWN_ITEMS.map((k) => `<button class="itog ${L.items.includes(k) ? 'on' : ''}" data-k="${k}" ${isHost ? '' : 'disabled'} title="${ITEMS[k].desc}">${ITEMS[k].name}</button>`).join('');
-    $('itemToggles').querySelectorAll('.itog').forEach((b) => (b.onclick = () => {
-      const k = b.dataset.k; L.items = L.items.includes(k) ? L.items.filter((x) => x !== k) : L.items.concat(k);
-      Sfx.play('click'); renderLobby(); pushLobby();
-    }));
-    $('itemNone').onclick = () => { L.items = []; renderLobby(); pushLobby(); };
-    $('itemAll').onclick = () => { L.items = GD.SPAWN_ITEMS.slice(); renderLobby(); pushLobby(); };
-    $('itemSummary').textContent = L.itemRate === 0 || !L.items.length ? 'アイテムなし' : `${L.items.length}種類・出現量${['なし', '少なめ', '普通', '多め'][L.itemRate]}`;
+    ['segCpu', 'segLvl', 'segMode', 'segTeams', 'segFF'].forEach((id, i) => { const v = [L.cpu, L.lvl, L.mode, L.teams, L.ff][i]; $(id).querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.v === v)); });
+    $('ruleSum').innerHTML = ruleSummary(L);
+    $('bRuleSet').textContent = isHost ? '⚙ ルール' : '⚙ ルールを見る'; $('bItemSet').textContent = isHost ? '🎁 アイテム' : '🎁 アイテムを見る';
+    if (!$('ruleSet').classList.contains('hidden')) renderRules();
+    if (!$('itemSet').classList.contains('hidden')) renderItems();
   }
   function seg(id, key, after) { $(id).querySelectorAll('button').forEach((b) => (b.onclick = () => { S.lobby[key] = +b.dataset.v; if (after) after(); Sfx.play('click'); renderLobby(); pushLobby(); })); }
-  seg('segRate', 'itemRate'); seg('segMode', 'mode', rebalance); seg('segTeams', 'teams', rebalance); seg('segFF', 'ff');
-  seg('segLives', 'lives'); seg('segCpu', 'cpu'); seg('segLvl', 'lvl');
+  seg('segMode', 'mode', rebalance); seg('segTeams', 'teams', rebalance); seg('segFF', 'ff');
+  seg('segCpu', 'cpu'); seg('segLvl', 'lvl');
+  // ---------- ルール設定（スマブラ風）----------
+  const RULE_DEF = { mode: 'stock', stock: 2, time: 3, sd: true, kbRate: 1, startHero: 0, tpRate: 1, skills: true, gimmicks: true, phases: true, events: true };
+  const onoff = (v) => (v ? 'あり' : 'なし');
+  const RULE_ROWS = [
+    { k: 'mode', name: 'ルール', icon: '🏆', vals: ['stock', 'time', 'stime'], label: (v) => ({ stock: 'ストック制', time: 'タイム制', stime: 'ストック＋時間' }[v]),
+      desc: (v) => ({ stock: '決まった回数落ちたら脱落。最後まで残った人の勝ち', time: '時間内に何回落としたかで勝負。落とすと+1、落ちると−1', stime: 'ストック制に制限時間つき。時間切れは残りストックが多い人の勝ち' }[v]) },
+    { k: 'stock', name: 'ストック', icon: '♥', vals: [1, 2, 3, 4, 5, 6, 7, 8, 9], label: (v) => v + '機', show: (R) => R.mode !== 'time', desc: () => '場外に落ちてもいい回数' },
+    { k: 'time', name: '制限時間', icon: '⏱', vals: [1, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20], label: (v) => v + '分', show: (R) => R.mode !== 'stock', desc: () => '時間が来たら試合終了' },
+    { k: 'sd', name: 'サドンデス', icon: '💀', vals: [true, false], label: onoff, show: (R) => R.mode !== 'stock', desc: (v) => (v ? '同点ならヘロヘロ値300％・一撃で決着' : '同点なら引き分け') },
+    { k: 'kbRate', name: 'ふっとび率', icon: '💨', vals: [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2], label: (v) => v.toFixed(1) + '倍', desc: () => '大きいほど早く場外まで吹っ飛ぶ' },
+    { k: 'startHero', name: '最初のヘロヘロ値', icon: '😵', vals: [0, 50, 100, 150, 200, 300], label: (v) => v + '%', desc: () => '試合開始時のヘロヘロ値' },
+    { k: 'tpRate', name: 'TPのたまる速さ', icon: '⚡', vals: [0.5, 1, 1.5, 2, 3], label: (v) => v + '倍', desc: () => '大きいほどスキルをたくさん使える' },
+    { k: 'skills', name: 'スキル', icon: '✨', vals: [true, false], label: onoff, desc: (v) => (v ? 'スキル1〜4が使える' : 'パンチと掴みだけで勝負') },
+    { k: 'gimmicks', name: 'ステージギミック', icon: '🌀', vals: [true, false], label: onoff, desc: () => '強風・氷・ベルトコンベア・床崩れなど（1分ごとに変わる）' },
+    { k: 'phases', name: '時間で進むイベント', icon: '🔥', vals: [true, false], label: onoff, desc: () => '3分でガチ乱闘期（ステージが崩れる）、9分でMars襲来' },
+    { k: 'events', name: 'ランダムイベント', icon: '🎲', vals: [true, false], label: onoff, desc: () => '停電・食中毒・アイテム配布・隕石など' },
+  ];
+  const RULE_PRESETS = [
+    { n: 'スタンダード', d: 'いつもの乱闘', r: {}, items: null, rate: 2 },
+    { n: 'タイム乱闘', d: '2分で撃墜数を競う', r: { mode: 'time', time: 2 }, rate: 2 },
+    { n: 'タイマン', d: '3機・ギミックなし', r: { stock: 3, gimmicks: false, events: false }, rate: 1 },
+    { n: 'ハチャメチャ', d: 'ふっとび1.5倍・TP3倍・アイテム多め', r: { kbRate: 1.5, tpRate: 3, startHero: 50 }, rate: 3 },
+    { n: 'ガチ', d: 'アイテム・ギミック・イベントなし', r: { stock: 3, gimmicks: false, phases: false, events: false }, rate: 0 },
+    { n: 'パンチだけ', d: 'スキルなし・アイテムなし', r: { skills: false, events: false }, rate: 0 },
+  ];
+  function loadRules() { try { return { ...RULE_DEF, ...JSON.parse(localStorage.getItem('yb_rules') || '{}') }; } catch (e) { return { ...RULE_DEF }; } }
+  function saveRules() { try { localStorage.setItem('yb_rules', JSON.stringify(S.lobby.rules)); localStorage.setItem('yb_items', JSON.stringify({ items: S.lobby.items, rate: S.lobby.itemRate })); } catch (e) { /* noop */ } }
+  S.lobby.rules = loadRules();
+  try { const it = JSON.parse(localStorage.getItem('yb_items') || 'null'); if (it) { S.lobby.items = it.items.filter((k) => GD.SPAWN_ITEMS.includes(k)); S.lobby.itemRate = it.rate; } } catch (e) { /* noop */ }
+  S.lobby.lives = S.lobby.rules.stock;
+  function ruleSummary(L) {
+    const R = L.rules || RULE_DEF;
+    const main = R.mode === 'time' ? `タイム制 ${R.time}分` : R.mode === 'stime' ? `${R.stock}機・${R.time}分` : `ストック${R.stock}機`;
+    const chips = [];
+    if (R.kbRate !== 1) chips.push('ふっとび' + R.kbRate.toFixed(1) + '倍');
+    if (R.startHero) chips.push('最初' + R.startHero + '%');
+    if (R.tpRate !== 1) chips.push('TP' + R.tpRate + '倍');
+    if (!R.skills) chips.push('スキルなし');
+    if (!R.gimmicks) chips.push('ギミックなし');
+    if (!R.phases) chips.push('進行イベントなし');
+    if (!R.events) chips.push('ランダムイベントなし');
+    const it = L.itemRate === 0 || !L.items.length ? 'アイテムなし' : `アイテム${L.items.length}種・${['なし', '少なめ', '普通', '多め'][L.itemRate]}`;
+    return `<b class="rmain">${main}</b>${chips.map((c) => `<span class="rchip">${c}</span>`).join('')}<span class="rchip it">${it}</span>`;
+  }
+  function setRule(k, v) { const L = S.lobby; L.rules = { ...L.rules, [k]: v }; L.lives = L.rules.stock; saveRules(); renderRules(); renderLobby(); pushLobby(); }
+  function renderRules() {
+    const L = S.lobby, R = L.rules, can = S.role !== 'client';
+    $('ruleRO').textContent = can ? '' : 'ホストだけが変えられます';
+    $('rulePresets').innerHTML = RULE_PRESETS.map((p, i) => `<button class="rp" data-i="${i}" ${can ? '' : 'disabled'}><b>${p.n}</b><small>${p.d}</small></button>`).join('');
+    $('rulePresets').querySelectorAll('.rp').forEach((b) => (b.onclick = () => { const p = RULE_PRESETS[+b.dataset.i]; L.rules = { ...RULE_DEF, ...p.r }; L.lives = L.rules.stock; L.itemRate = p.rate; if (p.rate) L.items = L.items.length ? L.items : GD.SPAWN_ITEMS.slice(); saveRules(); Sfx.play('pickup'); toast('ルール「' + p.n + '」にしました', 1200); renderRules(); renderLobby(); pushLobby(); }));
+    $('ruleRows').innerHTML = RULE_ROWS.filter((r) => !r.show || r.show(R)).map((r) => {
+      const v = R[r.k], i = r.vals.findIndex((x) => x === v), def = RULE_DEF[r.k] === v;
+      return `<div class="rr ${def ? '' : 'chg'}" data-k="${r.k}"><span class="ri">${r.icon}</span><div class="rn"><b>${r.name}</b><small>${r.desc(v)}</small></div>
+        <div class="rv"><button class="ra" data-d="-1" ${can ? '' : 'disabled'}>◀</button><span class="rvv">${r.label(v)}</span><button class="ra" data-d="1" ${can ? '' : 'disabled'}>▶</button></div></div>`;
+    }).join('');
+    $('ruleRows').querySelectorAll('.rr').forEach((el) => {
+      const r = RULE_ROWS.find((x) => x.k === el.dataset.k);
+      const step = (d) => { if (!can) return; const i = r.vals.findIndex((x) => x === R[r.k]); const n = r.vals[(Math.max(0, i) + d + r.vals.length) % r.vals.length]; Sfx.play('click'); setRule(r.k, n); };
+      el.querySelectorAll('.ra').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); step(+b.dataset.d); }));
+      el.querySelector('.rvv').onclick = () => step(1);
+    });
+    // マイルール（3つまで保存）
+    const my = (() => { try { return JSON.parse(localStorage.getItem('yb_myrules') || '[]'); } catch (e) { return []; } })();
+    $('ruleMy').innerHTML = can ? `<span class="lab" style="margin:0">マイルール</span>` + [0, 1, 2].map((i) => `<div class="mys"><span>${my[i] ? esc(my[i].name) : '（空き）'}</span><button class="linkb" data-s="${i}">保存</button>${my[i] ? `<button class="linkb" data-l="${i}">呼び出す</button>` : ''}</div>`).join('') + '<button class="linkb" id="ruleReset">初期設定に戻す</button>' : '';
+    if (!can) return;
+    $('ruleMy').querySelectorAll('[data-s]').forEach((b) => (b.onclick = () => { const i = +b.dataset.s; const name = prompt('マイルールの名前', my[i] ? my[i].name : 'マイルール' + (i + 1)); if (name === null) return; my[i] = { name: name.slice(0, 12) || 'マイルール' + (i + 1), rules: L.rules, items: L.items, rate: L.itemRate }; localStorage.setItem('yb_myrules', JSON.stringify(my)); toast('保存しました', 1000); renderRules(); }));
+    $('ruleMy').querySelectorAll('[data-l]').forEach((b) => (b.onclick = () => { const m = my[+b.dataset.l]; L.rules = { ...RULE_DEF, ...m.rules }; L.lives = L.rules.stock; L.items = m.items.filter((k) => GD.SPAWN_ITEMS.includes(k)); L.itemRate = m.rate; saveRules(); Sfx.play('pickup'); toast('「' + m.name + '」を呼び出しました', 1200); renderRules(); renderLobby(); pushLobby(); }));
+    $('ruleReset').onclick = () => { L.rules = { ...RULE_DEF }; L.lives = 2; saveRules(); renderRules(); renderLobby(); pushLobby(); };
+  }
+  // ---------- アイテム設定（画像つき）----------
+  const ITEM_CATS = [
+    { n: '武器', d: '[使う]で攻撃。弾がなくなると消える', ks: ['ar', 'sr', 'sg', 'monitor'] },
+    { n: '投げ・乗り物', d: '相手を縛ったり、乗って突進したり', ks: ['lan', 'chair'] },
+    { n: '回復・サポート', d: '状態異常を治したり、速くなったり', ks: ['detox', 'goreisan', 'energy'] },
+  ];
+  let itemImg = null;
+  function renderItems() {
+    const L = S.lobby, can = S.role !== 'client';
+    if (!itemImg) itemImg = Render.itemThumbs(GD.SPAWN_ITEMS);
+    $('itemRO').textContent = can ? '' : 'ホストだけが変えられます';
+    $('segRate2').innerHTML = ['なし', '少なめ', '普通', '多め'].map((n, i) => `<button data-v="${i}" class="${L.itemRate === i ? 'on' : ''}" ${can ? '' : 'disabled'}>${n}</button>`).join('');
+    $('segRate2').querySelectorAll('button').forEach((b) => (b.onclick = () => { L.itemRate = +b.dataset.v; Sfx.play('click'); saveRules(); renderItems(); renderLobby(); pushLobby(); }));
+    $('itemCount').textContent = L.itemRate === 0 ? 'アイテムは出ません（交換所だけ使えます）' : `${L.items.length} / ${GD.SPAWN_ITEMS.length} 種類が出る`;
+    const P = [['すべて', GD.SPAWN_ITEMS], ['なし', []], ['武器だけ', ITEM_CATS[0].ks], ['武器なし', GD.SPAWN_ITEMS.filter((k) => !ITEM_CATS[0].ks.includes(k))]];
+    $('itemPresets').innerHTML = P.map(([n], i) => `<button class="linkb big" data-i="${i}" ${can ? '' : 'disabled'}>${n}</button>`).join('');
+    $('itemPresets').querySelectorAll('button').forEach((b) => (b.onclick = () => { L.items = P[+b.dataset.i][1].slice(); if (L.items.length && !L.itemRate) L.itemRate = 2; Sfx.play('click'); saveRules(); renderItems(); renderLobby(); pushLobby(); }));
+    $('itemCats').innerHTML = ITEM_CATS.map((c, ci) => `<div class="icat"><div class="ich"><b>${c.n}</b><small>${c.d}</small><button class="linkb" data-c="${ci}" ${can ? '' : 'disabled'}>${c.ks.every((k) => L.items.includes(k)) ? 'まとめてオフ' : 'まとめてオン'}</button></div>
+      <div class="igrid">${c.ks.map((k) => { const on = L.items.includes(k); return `<button class="icard ${on ? 'on' : ''} ${L.itemRate === 0 ? 'dim' : ''}" data-k="${k}" ${can ? '' : 'disabled'}>
+        <span class="isw">${on ? 'ON' : 'OFF'}</span><img src="${itemImg[k]}" alt=""><b>${ITEMS[k].name}</b><small>${keyDesc(ITEMS[k].desc).replace(/\[使う\]/g, '[' + Settings.key('use') + ']')}</small></button>`; }).join('')}</div></div>`).join('');
+    $('itemCats').querySelectorAll('.icard').forEach((b) => (b.onclick = () => { const k = b.dataset.k; L.items = L.items.includes(k) ? L.items.filter((x) => x !== k) : L.items.concat(k); if (L.items.length && !L.itemRate) L.itemRate = 2; Sfx.play('click'); saveRules(); renderItems(); renderLobby(); pushLobby(); }));
+    $('itemCats').querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => { const ks = ITEM_CATS[+b.dataset.c].ks; const all = ks.every((k) => L.items.includes(k)); L.items = all ? L.items.filter((k) => !ks.includes(k)) : [...new Set(L.items.concat(ks))]; Sfx.play('click'); saveRules(); renderItems(); renderLobby(); pushLobby(); }));
+  }
+  $('bRuleSet').onclick = () => { renderRules(); show('ruleSet'); Sfx.play('click'); };
+  $('bItemSet').onclick = () => { renderItems(); show('itemSet'); Sfx.play('click'); };
+
   $('bChar').onclick = () => openSelect((c) => { if (S.role === 'client') { Net.sendHost({ t: 'char', char: c }); screen('lobby'); renderLobby(); } else enterLobby(); });
   $('bCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(S.code); toast('コピーしました：' + S.code); };
   $('bLeave').onclick = () => { if (S.role === 'host' && S.lobby.members.length > 1 && !confirm('部屋を閉じますか？（みんなの接続が切れます）')) return; toTitle(); };
@@ -514,7 +604,7 @@
   function startGame(map) {
     const L = S.lobby;
     fixTeams();
-    const g = new Sim.Game({ lives: L.lives, map, teamMode: !!L.mode, ff: !!L.ff, items: L.items, itemRate: L.itemRate });
+    const g = new Sim.Game({ lives: L.rules.stock, rules: L.rules, map, teamMode: !!L.mode, ff: !!L.ff, items: L.items, itemRate: L.itemRate });
     S.peerMap.clear();
     for (const m of L.members) {
       const p = g.addPlayer({ name: m.name, char: m.char, team: m.team | 0 });
@@ -810,10 +900,15 @@
     const sc = Math.min(1, window.innerWidth / 1380, window.innerHeight / 760);
     document.documentElement.style.setProperty('--hs', sc.toFixed(3));
     const me = s.p.find((p) => p.id === S.myPid);
-    $('hT').textContent = fmt(s.t);
-    $('hPh').textContent = PH[s.ph] + (s.ph === 'gimmick' ? '：' + GD.GIMMICKS[s.g].name : '');
+    const ru = s.ru || { mo: 'stock', tl: 0, sd: 0, ph: 1 };
+    const timeMode = ru.mo === 'time' && !ru.sd;
+    // 制限時間があるときは残り時間を大きく表示（残り10秒は赤く点滅）
+    if (ru.tl && !ru.sd) { const left = Math.max(0, ru.tl - s.t); $('hT').textContent = fmt(Math.ceil(left)); $('hT').classList.toggle('hurry', left <= 10); }
+    else { $('hT').textContent = ru.sd ? 'サドンデス' : fmt(s.t); $('hT').classList.toggle('hurry', !!ru.sd); }
+    $('hPh').textContent = (ru.ph ? PH[s.ph] : 'ルール：' + (ru.mo === 'time' ? 'タイム制' : 'ストック制')) + (s.ph === 'gimmick' && s.g !== 'none' ? '：' + GD.GIMMICKS[s.g].name : '');
     let nx = '';
-    if (s.t < T.GACHI) nx = 'ガチ乱闘まで ' + fmt(T.GACHI - s.t);
+    if (!ru.ph) nx = ru.tl ? '' : '経過 ' + fmt(s.t);
+    else if (s.t < T.GACHI) nx = 'ガチ乱闘まで ' + fmt(T.GACHI - s.t);
     else if (s.t < T.MARS && !s.m) nx = 'Mars襲来まで ' + fmt(T.MARS - s.t);
     else if (s.ph === 'mars' && !s.m && s.t < T.CURTAIN) nx = 'Mars（真）乱入まで ' + fmt(T.CURTAIN - s.t);
     else if (s.ph === 'curtain') nx = '強制終了まで ' + fmt(Math.max(0, T.END - s.t));
@@ -828,21 +923,21 @@
     // スコアボード
     const row = (p) => {
       const col = '#' + CHARS[p.c].color.toString(16).padStart(6, '0');
-      return `<div class="r ${p.e ? 'out' : ''} ${p.id === S.myPid ? 'mine' : ''}"><span class="dot" style="background:${col}"></span>${esc(p.n)}${p.mi ? '（手下）' : ''}<span class="h">${'●'.repeat(p.l)} ${p.e ? '脱落' : p.h + '%'}</span></div>`;
+      return `<div class="r ${p.e ? 'out' : ''} ${p.id === S.myPid ? 'mine' : ''}"><span class="dot" style="background:${col}"></span>${esc(p.n)}${p.mi ? '（手下）' : ''}<span class="h">${timeMode ? `<b class="scv">${p.sc > 0 ? '+' : ''}${p.sc | 0}</b>` : '●'.repeat(Math.min(p.l, 9))} ${p.e ? '脱落' : p.h + '%'}</span></div>`;
     };
-    const sorted = s.p.slice().sort((a, b) => (a.e - b.e) || (b.l - a.l) || (b.k - a.k));
+    const sorted = s.p.slice().sort((a, b) => timeMode ? ((b.sc | 0) - (a.sc | 0)) || (b.k - a.k) : (a.e - b.e) || (b.l - a.l) || (b.k - a.k));
     let rows = '';
     if (s.tmode) {
       const ts = [...new Set(s.p.map((p) => p.tm))].sort();
       rows = ts.map((t) => { const ps = sorted.filter((p) => p.tm === t); const left = ps.filter((p) => !p.e).length;
         return `<div class="thead" style="background:${GD.TEAMS[t].css}">${GD.TEAMS[t].name}チーム <span>残り${left}人</span></div>` + ps.map(row).join(''); }).join('');
     } else rows = sorted.map(row).join('');
-    $('board').innerHTML = `<div class="tiny">${s.tmode ? 'チーム戦 ／ ' : ''}ライフ ${s.lives} ／ 撃墜でTP+2</div>` + rows;
+    $('board').innerHTML = `<div class="tiny">${s.tmode ? 'チーム戦 ／ ' : ''}${ru.sd ? 'サドンデス' : timeMode ? 'タイム制：落とす+1／落ちる−1' : 'ストック ' + s.lives} ／ 撃墜でTP+2</div>` + rows;
     if (!me) return;
     if (!S.faceSet) { $('hFace').src = thumbs[me.c]; S.faceSet = true; renderSkills(me); }
     const hc = me.h < 50 ? '#ffffff' : me.h < 100 ? '#ffd23b' : me.h < 150 ? '#ff9f43' : '#ff3b3b';
     $('hHero').innerHTML = `<span style="color:${hc}">${me.h}</span><small style="color:${hc}">%</small>`;
-    $('hLives').innerHTML = Array.from({ length: s.lives }, (_, i) => `<i class="${i < me.l ? '' : 'off'}"></i>`).join('');
+    $('hLives').innerHTML = timeMode ? `<span class="hsc">スコア ${me.sc > 0 ? '+' : ''}${me.sc | 0}</span>` : Array.from({ length: Math.min(ru.sd ? 1 : s.lives, 9) }, (_, i) => `<i class="${i < me.l ? '' : 'off'}"></i>`).join('');
     $('hKills').textContent = '撃墜 ' + me.k;
     $('hTp').style.width = (me.tp / 30) * 100 + '%'; $('hTpN').textContent = 'TP ' + me.tp + '/30';
     // スキル
@@ -933,8 +1028,9 @@
     if (document.pointerLockElement) document.exitPointerLock();
     show('pause', false);
     $('resT').textContent = res.text;
-    const rows = s.p.slice().sort((a, b) => (res.winners.includes(b.id) - res.winners.includes(a.id)) || (a.e - b.e) || (b.l - a.l) || (b.k - a.k));
-    $('resTb').innerHTML = `<tr><th>#</th>${s.tmode ? '<th>チーム</th>' : ''}<th>プレイヤー</th><th>キャラ</th><th>撃墜</th><th>ライフ</th></tr>` + rows.map((p, i) => `<tr class="${res.winners.includes(p.id) ? 'win' : ''}"><td>${i + 1}</td>${s.tmode ? `<td><span class="tbadge" style="position:static;background:${GD.TEAMS[p.tm].css}">${GD.TEAMS[p.tm].name}</span></td>` : ''}<td>${esc(p.n)}</td><td>${CHARS[p.c].name}</td><td>${p.k}</td><td>${p.e ? '脱落' : p.l}</td></tr>`).join('');
+    const tm = s.ru && s.ru.mo === 'time';
+    const rows = s.p.filter((p) => !p.mi || !p.e).slice().sort((a, b) => (res.winners.includes(b.id) - res.winners.includes(a.id)) || (tm ? ((b.sc | 0) - (a.sc | 0)) : (a.e - b.e) || (b.l - a.l)) || (b.k - a.k));
+    $('resTb').innerHTML = `<tr><th>#</th>${s.tmode ? '<th>チーム</th>' : ''}<th>プレイヤー</th><th>キャラ</th><th>撃墜</th><th>${tm ? 'スコア' : 'ライフ'}</th></tr>` + rows.map((p, i) => `<tr class="${res.winners.includes(p.id) ? 'win' : ''}"><td>${i + 1}</td>${s.tmode ? `<td><span class="tbadge" style="position:static;background:${GD.TEAMS[p.tm].css}">${GD.TEAMS[p.tm].name}</span></td>` : ''}<td>${esc(p.n)}</td><td>${CHARS[p.c].name}</td><td>${p.k}</td><td>${tm ? ((p.sc > 0 ? '+' : '') + (p.sc | 0)) : p.e ? '脱落' : p.l}</td></tr>`).join('');
     const isHost = S.role !== 'client';
     $('bResLobby').classList.toggle('hidden', !isHost);
     $('bResLobby').textContent = S.role === 'solo' ? 'もう一回！' : 'すぐロビーへ';

@@ -50,6 +50,10 @@
       <div style="flex:0 0 auto;text-align:right;display:flex;gap:8px"><button class="btn small white" id="bSet2">設定</button><button class="btn small cyan" id="bChar">キャラ変更</button></div>
     </div>
     <div class="members" id="members"></div>
+    <div class="rulebar" id="ruleBar">
+      <div class="rb-sum" id="ruleSum"></div>
+      <div class="rb-btns"><button class="btn small yel" id="bRuleSet">⚙ ルール</button><button class="btn small cyan" id="bItemSet">🎁 アイテム</button></div>
+    </div>
     <div id="hostOpts">
       <div class="row" style="gap:18px;flex-wrap:wrap;margin-bottom:6px">
         <div style="flex:0 0 auto"><label class="lab">モード</label><div class="seg" id="segMode"><button data-v="0" class="on">個人戦</button><button data-v="1">チーム戦</button></div></div>
@@ -59,13 +63,8 @@
         </div>
       </div>
       <div class="row" style="gap:18px;flex-wrap:wrap">
-        <div style="flex:0 0 auto"><label class="lab">ライフ</label><div class="seg" id="segLives"><button data-v="1">1</button><button data-v="2" class="on">2</button><button data-v="3">3</button></div></div>
         <div style="flex:0 0 auto"><label class="lab">CPUの数</label><div class="seg" id="segCpu"><button data-v="0">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="3" class="on">3</button><button data-v="5">5</button><button data-v="7">7</button></div></div>
         <div style="flex:0 0 auto"><label class="lab">CPUの強さ</label><div class="seg" id="segLvl"><button data-v="1">よわい</button><button data-v="2" class="on">ふつう</button><button data-v="3">つよい</button></div></div>
-      </div>
-      <div class="row" style="gap:18px;flex-wrap:wrap;margin-top:6px;align-items:flex-end">
-        <div style="flex:0 0 auto"><label class="lab">アイテムの出現量</label><div class="seg" id="segRate"><button data-v="0">なし</button><button data-v="1">少なめ</button><button data-v="2" class="on">普通</button><button data-v="3">多め</button></div></div>
-        <div style="flex:1 1 300px"><label class="lab">出るアイテム（クリックでオン／オフ）<button class="linkb" id="itemAll">全部</button><button class="linkb" id="itemNone">なし</button></label><div class="itoggles" id="itemToggles"></div></div>
       </div>
     </div>
     <div class="row" style="margin-top:18px">
@@ -132,6 +131,24 @@
     <div style="flex:0 0 auto;display:flex;gap:8px"><button class="btn small white" id="helpSet">キーを変える</button><button class="btn small" data-close>とじる</button></div></div>
   <div class="helpgrid" id="helpKeys"></div>
   <div class="helptip" id="helpTip"></div>
+</div></div>
+
+<!-- ルール設定（スマブラ風） -->
+<div id="ruleSet" class="ov hidden"><div class="panel rulepanel">
+  <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="h1" style="flex:0 0 auto;margin:0">⚙ ルール</div>
+    <div style="flex:0 0 auto;display:flex;gap:8px;align-items:center"><span class="tiny" id="ruleRO"></span><button class="btn small" data-close>決定</button></div></div>
+  <div class="rpresets" id="rulePresets"></div>
+  <div class="rrows" id="ruleRows"></div>
+  <div class="rmy" id="ruleMy"></div>
+</div></div>
+
+<!-- アイテム設定 -->
+<div id="itemSet" class="ov hidden"><div class="panel itempanel">
+  <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="h1" style="flex:0 0 auto;margin:0">🎁 アイテム</div>
+    <div style="flex:0 0 auto;display:flex;gap:8px;align-items:center"><span class="tiny" id="itemRO"></span><button class="btn small" data-close>決定</button></div></div>
+  <div class="irate"><span class="lab" style="margin:0">出現量</span><div class="seg" id="segRate2"></div><span class="tiny" id="itemCount"></span></div>
+  <div class="ipresets" id="itemPresets"></div>
+  <div id="itemCats"></div>
 </div></div>
 
 <!-- 更新履歴 -->

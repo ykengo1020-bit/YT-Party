@@ -1105,6 +1105,28 @@ window.Render = (function () {
     return out;
   }
 
+  // アイテム設定画面用の画像
+  function itemThumbs(keys) {
+    const out = {};
+    const sc = new THREE.Scene();
+    sc.add(new THREE.HemisphereLight(0xffffff, 0x666688, 0.7));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.9); dl.position.set(2, 4, 5); sc.add(dl);
+    const cm = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+    const old = renderer.getSize(new THREE.Vector2());
+    renderer.setSize(192, 192, false); renderer.setClearColor(0x000000, 0);
+    const oldTM = renderer.toneMapping; renderer.toneMapping = THREE.NoToneMapping;
+    for (const k of keys) {
+      const m = itemMesh(k); sc.add(m);
+      if (['monitor', 'goreisan', 'detox', 'energy'].includes(k)) m.rotation.set(0.15, -0.45, 0); else if (k === 'chair') m.rotation.set(0.1, -0.7, 0); else m.rotation.set(0.25, -1.25, 0);
+      const box = new THREE.Box3().setFromObject(m), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3()).length();
+      cm.position.set(c.x + sz * 0.25, c.y + sz * 0.35, c.z + sz * 1.8); cm.lookAt(c);
+      renderer.render(sc, cm);
+      out[k] = renderer.domElement.toDataURL();
+      sc.remove(m); m.traverse((c) => c.geometry && c.geometry.dispose());
+    }
+    renderer.toneMapping = oldTM; renderer.setSize(old.x, old.y, false); resize();
+    return out;
+  }
   // ---------- 毎フレーム描画 ----------
   function decodeTile(v) {
     let warn = false, shake = false;
@@ -1532,5 +1554,5 @@ window.Render = (function () {
       ch.tag.visible = false; chars.set(-1 - i, ch);
     });
   }
-  return { _render: () => renderer.render(scene, camera), _buildChar: (k) => buildChar(k), _itemMesh: (t) => itemMesh(t), init, update, thumbnails, mapPreview, applySettings, setHideTags: (v) => (hideTags = v), setMyId, clear, idle, project, previewChar, cam, get camera() { return camera; }, get scene() { return scene; }, get mars() { return marsObj; } };
+  return { itemThumbs, _render: () => renderer.render(scene, camera), _buildChar: (k) => buildChar(k), _itemMesh: (t) => itemMesh(t), init, update, thumbnails, mapPreview, applySettings, setHideTags: (v) => (hideTags = v), setMyId, clear, idle, project, previewChar, cam, get camera() { return camera; }, get scene() { return scene; }, get mars() { return marsObj; } };
 })();

@@ -18,7 +18,13 @@ window.Sim = (function () {
 
   class Game {
     constructor(opts) {
-      this.lives = opts.lives || 2;
+      // スマブラ風のルール設定（ロビーの「ルール」画面で変更）
+      this.rules = { mode: 'stock', stock: opts.lives || 2, time: 3, kbRate: 1, startHero: 0, tpRate: 1, skills: true, gimmicks: true, phases: true, events: true, sd: true, ...(opts.rules || {}) };
+      const RU = this.rules;
+      RU.stock = clamp(RU.stock | 0 || 2, 1, 9); RU.kbRate = clamp(+RU.kbRate || 1, 0.3, 3); RU.tpRate = clamp(+RU.tpRate || 1, 0.25, 5); RU.startHero = clamp(RU.startHero | 0, 0, 999);
+      this.lives = RU.mode === 'time' ? 99 : RU.stock;
+      this.timeLimit = RU.mode === 'stock' ? 0 : clamp(+RU.time || 3, 1, 99) * 60;
+      this.sd = false;
       this.map = GD.MAPS[opts.map] ? opts.map : 'arena';
       this.teamMode = !!opts.teamMode; this.ff = !!opts.ff;
       // 出るアイテム（ロビーで選択）と出現量 0:なし 1:少なめ 2:普通 3:多め
@@ -38,7 +44,7 @@ window.Sim = (function () {
       this.banner = null;
       this.buildTiles();
       this.plats = (GD.MAPS[this.map].plats || []).map((q) => ({ ...q, bx: q.x, bz: q.z, dx: 0, dz: 0 }));
-      this.setGimmick(pick(['wind', 'ice', 'conveyor', 'crumble', 'lagbridge', 'rack']));
+      this.setGimmick(RU.gimmicks ? pick(['wind', 'ice', 'conveyor', 'crumble', 'lagbridge', 'rack']) : 'none');
     }
 
     // ---------- ステージ ----------
@@ -85,7 +91,7 @@ window.Sim = (function () {
         if (!t.on && t.back > 0) { t.back -= dt; if (t.back <= 0) t.on = true; }
       }
       // ガチ乱闘期：外周が崩れる
-      if (this.t >= T.GACHI) {
+      if (this.rules.phases && this.t >= T.GACHI) {
         const k = Math.floor((this.t - T.GACHI) / 30); // ring 0,1,2 を順に崩す
         for (const t of this.tiles) {
           if (t.ring < Math.min(k, 3) && !t.gone) { t.gone = true; t.on = false; this.emit({ k: 'crumble', x: t.x, z: t.z }); }
@@ -120,7 +126,7 @@ window.Sim = (function () {
       const p = {
         id: this.nextId++, name: o.name, char: o.char, bot: !!o.bot, cpu: o.cpu || 0, team: this.teamMode ? (o.team | 0) : -1,
         x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, ground: false,
-        hero: 0, stun: 0, hitstun: 0, lives: this.lives, tp: 3, tpT: 0, kills: 0, ticket: 0, ticketProg: 0,
+        hero: 0, stun: 0, hitstun: 0, lives: this.lives, tp: 3, tpT: 0, kills: 0, falls: 0, ticket: 0, ticketProg: 0,
         elim: false, respawn: 0, inv: 0, lastHit: null, lastHitT: -99,
         punchT: 0, punchSide: 0, punchCD: 0, holdPunch: 0, charging: 0, headT: 0, headCD: 0,
         grab: null, grabbedBy: null, grabT: 0, escape: 0, grabCD: 0, thrown: 0, lifted: false,
@@ -148,6 +154,7 @@ window.Sim = (function () {
         used.add(best);
         p.x = best.x; p.z = best.z; p.y = best.top + 0.5; p.yaw = Math.atan2(-p.x, -p.z);
       });
+      if (this.rules.startHero) this.players.forEach((p) => { p.hero = this.rules.startHero; p.nextStun = Math.floor(p.hero / 50) * 50 + 50; });
       this.say('ファイト！', '#fde047');
       this.emit({ k: 'sfx', n: 'start' });
     }
@@ -233,7 +240,7 @@ window.Sim = (function () {
       if (t.grab) this.release(t, false);
       t.hero = clamp(t.hero + heroAdd, 0, 999);
       // スマブラ風：ヘロヘロ値が高いほど青天井で吹っ飛ぶ
-      const k = Math.min(70, (kb * KB_MUL * (0.75 + t.hero / 48)) / this.weightDiv(t));
+      const k = Math.min(70, (kb * KB_MUL * this.rules.kbRate * (0.75 + t.hero / 48)) / this.weightDiv(t));
       const upk = k > 12 ? Math.max(up, 0.42) : up;
       t.vx = t.vx * 0.3 + dx * k; t.vz = t.vz * 0.3 + dz * k; t.vy = Math.max(t.vy, 0) * 0.3 + k * upk + (k > 4 ? 2 : 0);
       t.ground = false; t.onPlat = -1;
@@ -325,6 +332,7 @@ window.Sim = (function () {
     // ---------- スキル ----------
     useSkill(p, idx) {
       const sk = CHARS[p.char].skills[idx];
+      if (!this.rules.skills) { this.emit({ k: 'deny', id: p.id }); return; }
       if (!sk || p.tp < sk.tp) { this.emit({ k: 'deny', id: p.id }); return; }
       if (sk.id === 'positive' && p.positive) { this.emit({ k: 'txt', id: p.id, s: 'もう使った', c: '#9ca3af' }); return; }
       p.tp -= sk.tp;
@@ -538,7 +546,9 @@ window.Sim = (function () {
       if (p.item && ITEMS[p.item].cookie) { this.items.push({ id: this.nextId++, type: p.item, x: 0, y: 6, z: 3, vy: 0 }); }
       p.item = null; p.ammo = 0;
       if (p.minion) { p.elim = true; p.minion = false; return; }
+      p.falls++;
       p.lives--;
+      if (this.rules.mode === 'time' && !this.sd) p.lives = 99; // タイム制はなんどでも復活
       let keepHero = -1;
       if (p.lives <= 0 && p.char === 'wikitto' && !p.voice && p.tp >= 10) {
         p.voice = true; p.tp -= 10; p.lives = 1; keepHero = Math.min(999, Math.max(80, p.hero + 70));
@@ -601,7 +611,7 @@ window.Sim = (function () {
       m.slam = Math.max(0, m.slam - dt);
       // 20秒ごとの抽選
       m.roll -= dt;
-      if (m.roll <= 0) {
+      if (m.roll <= 0 && this.rules.events) {
         m.roll = 20;
         const alive = this.players.filter((p) => !p.elim && !p.minion && p.respawn <= 0);
         if (rnd() < 0.1 && alive.length) {
@@ -638,6 +648,39 @@ window.Sim = (function () {
           m.oshimai += 0.1;
         }
       }
+    }
+
+    // ---------- 時間切れ（タイム制・ストック＋時間制）----------
+    score(p) { return this.rules.mode === 'time' ? p.kills - p.falls : p.lives; }
+    timeUp() {
+      const ps = this.players.filter((p) => !p.minion && !p.elim);
+      let groups;
+      if (this.teamMode) {
+        const tm = {}; for (const p of this.players.filter((q) => !q.minion)) { tm[p.team] = tm[p.team] || { team: p.team, ps: [], sc: 0 }; tm[p.team].ps.push(p); if (this.rules.mode === 'time' || !p.elim) tm[p.team].sc += this.score(p); }
+        groups = Object.values(tm);
+      } else groups = ps.map((p) => ({ ps: [p], sc: this.score(p), team: -1 }));
+      if (!groups.length) { this.finish({ type: 'draw', winners: [], text: '時間切れ…引き分け' }); return; }
+      const best = Math.max(...groups.map((g) => g.sc));
+      const top = groups.filter((g) => g.sc === best);
+      if (top.length === 1) {
+        const g = top[0];
+        const text = this.teamMode ? GD.TEAMS[g.team].name + 'チームの勝利！（時間切れ）' : CHARS[g.ps[0].char].name + '（' + g.ps[0].name + '）の優勝！（時間切れ）';
+        this.finish({ type: 'win', team: this.teamMode ? g.team : undefined, winners: g.ps.map((p) => p.id), text });
+        return;
+      }
+      if (!this.rules.sd) { this.finish({ type: 'draw', winners: top.flatMap((g) => g.ps.map((p) => p.id)), text: '時間切れ…同点で引き分け' }); return; }
+      // サドンデス：同点の人だけ、ヘロヘロ値300％・ライフ1で決着
+      this.sd = true;
+      const keep = new Set(top.flatMap((g) => g.ps.filter((p) => !p.elim || this.rules.mode === 'time').map((p) => p.id)));
+      for (const p of this.players) {
+        if (p.minion) { p.elim = true; p.minion = false; continue; }
+        if (!keep.has(p.id)) { p.elim = true; p.lives = 0; continue; }
+        p.elim = false; p.lives = 1; p.hero = 300; p.nextStun = 350; p.respawn = 0; p.st = {}; p.grab = null; p.grabbedBy = null; this.doRespawn(p); p.inv = 1.5;
+      }
+      this.items = []; this.proj = [];
+      if (this.mars) { this.mars = null; }
+      this.say('サドンデス！ 300％・一撃で決着！', '#ff3b3b');
+      this.emit({ k: 'sfx', n: 'phase' });
     }
 
     // ---------- イベント ----------
@@ -689,19 +732,22 @@ window.Sim = (function () {
       this.t += dt; this.tick++;
       const t = this.t;
       // 時間進行
-      if (t < T.GACHI) {
+      const RU = this.rules;
+      if (t < T.GACHI || !RU.phases) {
         const gi = Math.floor(t / 60);
-        if (gi !== this.gimmickT) { this.gimmickT = gi; this.setGimmick(pick(['wind', 'ice', 'conveyor', 'crumble', 'lagbridge', 'rack'].filter((g) => g !== this.gimmick))); }
+        if (RU.gimmicks && gi !== this.gimmickT) { this.gimmickT = gi; this.setGimmick(pick(['wind', 'ice', 'conveyor', 'crumble', 'lagbridge', 'rack'].filter((g) => g !== this.gimmick))); }
       } else if (this.phase === 'gimmick') {
         this.phase = 'gachi'; this.setGimmick('none'); this.say('ガチ乱闘期！ステージが崩れていく', '#f97316');
         this.emit({ k: 'sfx', n: 'phase' });
       }
-      if (t >= T.MARS && this.phase !== 'mars' && this.phase !== 'curtain' && !this.marsRepelled) { this.phase = 'mars'; this.spawnMars(false); }
-      if (t >= T.CURTAIN && this.marsRepelled && !this.curtain) { this.curtain = true; this.phase = 'curtain'; this.spawnMars(true); }
-      if (t >= T.END && this.curtain) { this.finish({ type: 'bed', winners: [], text: '【GO TO BED】21分経過、ゲーム強制終了' }); return; }
+      if (RU.phases && t >= T.MARS && this.phase !== 'mars' && this.phase !== 'curtain' && !this.marsRepelled) { this.phase = 'mars'; this.spawnMars(false); }
+      if (RU.phases && t >= T.CURTAIN && this.marsRepelled && !this.curtain) { this.curtain = true; this.phase = 'curtain'; this.spawnMars(true); }
+      if (RU.phases && t >= T.END && this.curtain) { this.finish({ type: 'bed', winners: [], text: '【GO TO BED】21分経過、ゲーム強制終了' }); return; }
       // イベント
       this.eventT -= dt;
-      if (this.eventT <= 0) { this.eventT = 30; this.rollEvent(); }
+      if (this.eventT <= 0) { this.eventT = 30; if (RU.events) this.rollEvent(); }
+      // 制限時間
+      if (this.timeLimit && !this.sd && t >= this.timeLimit) { this.timeUp(); if (this.over) return; }
       if (this.blackout > 0) { this.blackout -= dt; if (this.blackout <= 0) { this.players.forEach((p) => { if (!p.elim) p.tp = Math.min(30, p.tp + 5); }); this.say('停電復旧：みんな休めた（TP+5）', '#fde68a'); } }
       // アイテム湧き
       this.itemT -= dt;
@@ -756,7 +802,7 @@ window.Sim = (function () {
 
       // TP自然回復
       p.tpT += dt;
-      const tpI = p.buffs.tpx2 ? 2.5 : 5;
+      const tpI = (p.buffs.tpx2 ? 2.5 : 5) / this.rules.tpRate;
       if (p.tpT >= tpI) { p.tpT = 0; p.tp = Math.min(30, p.tp + 1); }
       // ヘロヘロ自然回復
       // パッシブ
@@ -1151,7 +1197,7 @@ window.Sim = (function () {
     snapshot() {
       const r2 = (v) => Math.round(v * 100) / 100;
       return {
-        t: r2(this.t), g: this.gimmick, ph: this.phase, wd: r2(this.windDir), bo: this.blackout > 0 ? 1 : 0, lives: this.lives,
+        t: r2(this.t), g: this.gimmick, ph: this.phase, wd: r2(this.windDir), bo: this.blackout > 0 ? 1 : 0, lives: this.lives, ru: { mo: this.rules.mode, tl: this.timeLimit, sd: this.sd ? 1 : 0, ph: this.rules.phases ? 1 : 0 },
         mp: this.map, tmode: this.teamMode ? 1 : 0, sh: this.shopList,
         pl: this.plats.map((q) => [Math.round(q.x * 100) / 100, Math.round(q.z * 100) / 100, q.w, q.d, q.y]),
         tl: this.tiles.map((t) => (t.none ? -200 : t.gone ? -99 : t.on ? r2(t.top) : -50) + (t.shake > 0 ? 1000 : 0) + (t.blink > 2 || (t.warn && !t.gone) ? 2000 : 0)),
@@ -1161,7 +1207,7 @@ window.Sim = (function () {
         m: this.mars ? { hp: r2(this.mars.hp), sc: this.mars.sc, tr: this.mars.true ? 1 : 0, fl: this.mars.flash > 0 ? 1 : 0, sl: r2(this.mars.slam), dn: this.mars.down > 0 ? 1 : 0, os: r2(this.mars.oshimai), age: r2(this.t - this.mars.t0) } : null,
         p: this.players.map((p) => ({
           id: p.id, n: p.name, c: p.char, tm: p.team, x: r2(p.x), y: r2(p.y), z: r2(p.z), yw: r2(p.yaw), vy: r2(p.vy),
-          h: Math.round(p.hero), l: p.lives, tp: p.tp, k: p.kills, tk: p.ticket, tkp: p.ticketProg,
+          h: Math.round(p.hero), l: p.lives, tp: p.tp, k: p.kills, sc: p.kills - p.falls, tk: p.ticket, tkp: p.ticketProg,
           e: p.elim ? 1 : 0, rs: p.respawn > 0 ? r2(p.respawn) : 0, inv: p.inv > 0 ? 1 : 0, mi: p.minion ? 1 : 0, bot: p.bot ? 1 : 0,
           gr: p.ground ? 1 : 0, pt: r2(p.punchT), ps: p.punchSide, ch: r2(p.charging), hd: r2(p.headT), gb: p.grab || 0, gby: p.grabbedBy || 0, cs: p.castT > 0 ? p.castSid : 0, cq: p.castT > 0 ? r2(1 - p.castT / p.castDur) : 0, ga: r2(p.grabAnim || 0), tw: p.throwAnim > 0 ? 1 : 0, tr: p.trail > 0 ? 1 : 0,
           ld: p.ledge ? 1 : 0, sn: r2(p.stun), hs: p.hitstun > 0 ? 1 : 0, gd: p.guard ? 1 : 0, ds: p.dashT > 0 ? 1 : 0, sy: p.scy > 0 ? 1 : 0, cr: p.crouchT > 0 ? 1 : 0,
