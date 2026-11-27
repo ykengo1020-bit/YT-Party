@@ -185,6 +185,70 @@ window.GD = (function () {
       plats: [P(-7.8, -7.8, 2.2, 2.6, 2.6, { ax: 1, r: 2.6, sp: 0.6 }), P(7.8, 7.8, 2.2, 2.6, 2.6, { ax: 1, r: 2.6, sp: 0.6, ph: 3.14 }), P(0, 0, 4.2, 2.6, 2.6)] },
     scatter: { name: 'とびとび足場', desc: '高さの違う2×2の足場16個と動く床', tile: (i, j) => (i % 3 !== 2 && j % 3 !== 2 ? ((Math.floor(i / 3) + Math.floor(j / 3)) % 3) * 0.9 : null),
       plats: [P(0, -3.9, 2.0, 2.0, 2.0, { ax: 1, r: 7, sp: 0.45 }), P(-3.9, 0, 2.6, 2.0, 2.0, { az: 1, r: 7, sp: 0.4, ph: 1.6 })] },
+    // ---- ライバル風のアリーナ（遮蔽物のある対戦マップ）----
+    colosseum: { name: 'コロシアム', desc: '左右対称の闘技場。木箱の陰で駆け引き', rivals: true,
+      style: { cover: 'crate', min: 1.4, deco: 'colosseum', sky: 0x7cc7ff },
+      tile: (i, j) => {
+        const r = Math.min(i, j, 10 - i, 10 - j);
+        if (r === 0 && (i <= 1 || i >= 9) && (j <= 1 || j >= 9)) return null;
+        if ((i === 2 || i === 8) && (j === 2 || j === 8)) return 1.6;          // 四隅の木箱
+        if ((i === 5 && (j === 2 || j === 8)) || (j === 5 && (i === 2 || i === 8))) return 0.8; // 低い塀
+        if (Math.abs(i - 5) <= 1 && Math.abs(j - 5) <= 1) return (i === 5 && j === 5) ? 1.6 : 0.4;
+        return 0;
+      },
+      plats: [P(-7.8, -7.8, 3.6, 2.4, 2.4), P(7.8, 7.8, 3.6, 2.4, 2.4), P(-7.8, 7.8, 3.6, 2.4, 2.4), P(7.8, -7.8, 3.6, 2.4, 2.4)] },
+    docks: { name: '港のコンテナ', desc: 'コンテナの通路と海。クレーンの床が行き来する', rivals: true,
+      style: { cover: 'container', min: 1.4, deco: 'docks', sky: 0x9bd3ff },
+      tile: (i, j) => {
+        if (i < 1 || i > 9) return null;
+        if (i === 5 && j >= 3 && j <= 7) return null;                           // 真ん中は海
+        if ((i === 3 || i === 7) && ((j >= 1 && j <= 3) || (j >= 7 && j <= 9))) return 1.8; // コンテナ
+        if ((i === 1 || i === 9) && j === 5) return 0.9;
+        if ((i === 4 || i === 6) && (j === 0 || j === 10)) return 0.9;
+        return 0;
+      },
+      plats: [P(0, 0, 0.3, 2.4, 2.4, { az: 1, r: 4.2, sp: 0.5 }), P(0, -11, 4.2, 2.6, 2.4, { ax: 1, r: 9, sp: 0.32 })] },
+    construction: { name: '工事現場', desc: '3階建ての足場と鉄骨。穴に注意', rivals: true,
+      style: { cover: 'concrete', min: 1.0, deco: 'construction', sky: 0xffd6a5 },
+      tile: (i, j) => {
+        if ((i === 4 && j === 4) || (i === 6 && j === 6) || ((i === 0 || i === 10) && j === 5) || ((j === 0 || j === 10) && i === 5)) return null;
+        if (i >= 8 && j <= 2) return 2.4; if (i <= 2 && j >= 8) return 2.4;
+        if (i >= 6 && j <= 4) return 1.2; if (i <= 4 && j >= 6) return 1.2;
+        return 0;
+      },
+      plats: [P(0, 0, 3.8, 9, 1.0), P(0, 0, 5.6, 1.0, 9), P(-7.8, -7.8, 1.8, 2.4, 2.4, { az: 1, r: 3, sp: 0.6 }), P(7.8, 7.8, 1.8, 2.4, 2.4, { ax: 1, r: 3, sp: 0.6, ph: 1.5 })] },
+    station: { name: '駅のホーム', desc: '2つのホームの間を電車が走る。陸橋で渡れる', rivals: true,
+      style: { cover: 'pillar', min: 1.4, deco: 'station', sky: 0xb9e6ff },
+      tile: (i, j) => {
+        if (j === 5) return null;                                               // 線路
+        if (j === 4 || j === 6) return i % 2 === 0 ? 0 : null;                  // 枕木のすき間
+        if ((i === 2 || i === 5 || i === 8) && (j === 1 || j === 9)) return 2.4; // 柱
+        if ((i === 3 && j === 2) || (i === 7 && j === 8)) return 1.0;           // ベンチ
+        return 0.6;
+      },
+      plats: [P(0, 0, 0.9, 7.8, 2.2, { ax: 1, r: 9.5, sp: 0.3 }), P(-10.4, 0, 3.0, 2.6, 8), P(10.4, 0, 3.0, 2.6, 8)] },
+    westown: { name: '西部の町', desc: '大通りと建物の屋根。たるの陰に隠れろ', rivals: true,
+      style: { cover: 'wood', min: 1.4, deco: 'westown', sky: 0xffc98a },
+      tile: (i, j) => {
+        const side = i <= 2 || i >= 8;
+        if (side && (j === 3 || j === 7)) return i === 0 || i === 10 ? null : 0; // 路地
+        if (side) return (i === 1 || i === 9) && j === 5 ? 2.6 : 1.8;           // 建物（真ん中は高い）
+        if ((i === 4 && j === 2) || (i === 6 && j === 8) || (i === 6 && j === 2) || (i === 4 && j === 8)) return 0.9; // たる
+        if (i === 5 && j === 5) return 0.7;                                      // 井戸
+        return 0;
+      },
+      plats: [P(0, -10.4, 3.2, 5.2, 2.2), P(0, 10.4, 3.2, 5.2, 2.2), P(0, 0, 4.6, 2.2, 2.2, { ax: 1, r: 5, sp: 0.45 })] },
+    onyx: { name: 'オニキス', desc: 'ひし形の黒いステージ。回る床とネオンの穴', rivals: true,
+      style: { cover: 'neon', min: 0.5, deco: 'onyx', sky: 0x2a1a4a },
+      tile: (i, j) => {
+        const d = Math.abs(i - 5) + Math.abs(j - 5);
+        if (d > 6) return null;
+        if (d === 3 && i !== 5 && j !== 5) return null;                          // ネオンの穴
+        if (d === 0) return 1.2;
+        if (d === 6 && (i === 5 || j === 5)) return 1.0;
+        return d <= 1 ? 0.6 : 0;
+      },
+      plats: [P(0, 0, 2.8, 2.2, 2.2, { circle: true, r: 6, sp: 0.5 }), P(0, 0, 4.4, 2.2, 2.2, { circle: true, r: 6, sp: 0.5, ph: 3.14 })] },
   };
   const MAP_KEYS = Object.keys(MAPS);
   const TEAMS = [

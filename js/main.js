@@ -387,7 +387,7 @@
         if (S.mode !== 'game' && $('select').classList.contains('hidden') && !S.voteView) { S.mode = 'lobby'; screen('lobby'); }
         renderLobby();
       } else if (d.t === 'vote') {
-        openVote(d.left);
+        openVote(d.left, d.opts);
       } else if (d.t === 'votes') {
         if (S.voteView) { S.voteView.tally = d.tally; S.voteView.left = d.left; S.voteView.voters = d.voters; drawVote(); }
       } else if (d.t === 'voteEnd') {
@@ -413,9 +413,12 @@
     const L = S.lobby;
     if (L.members.length + Math.min(L.cpu, 8 - L.members.length) < 2) { toast('CPUを1人以上にするか、友達を呼んでね'); return; }
     if (L.mode) { fixTeams(); const ts = new Set(L.members.map((m) => m.team).concat(L.cpuTeams)); if (ts.size < 2) { toast('チーム戦は2チーム以上に分かれてね（カードをクリックでチーム変更）'); return; } }
-    S.vote = { votes: {}, end: performance.now() + VOTE_SEC * 1000, done: false };
-    openVote(VOTE_SEC);
-    if (S.role === 'host') Net.broadcast({ t: 'vote', left: VOTE_SEC });
+    // 毎回ランダムに7つのマップを候補にする（＋ランダム）
+    const pool = GD.MAP_KEYS.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    const opts = pool.slice(0, 7);
+    S.vote = { votes: {}, end: performance.now() + VOTE_SEC * 1000, done: false, opts };
+    openVote(VOTE_SEC, opts);
+    if (S.role === 'host') Net.broadcast({ t: 'vote', left: VOTE_SEC, opts });
     clearInterval(S.voteTimer);
     S.voteTimer = setInterval(voteUpdate, 250);
     voteUpdate();
@@ -445,12 +448,13 @@
       setTimeout(() => { S.vote = null; startGame(win); }, 1800);
     }
   }
-  function openVote(left) {
+  function openVote(left, opts) {
+    opts = (opts || GD.MAP_KEYS).filter((k) => GD.MAPS[k]);
     S.voteView = { mine: null, tally: {}, left, voters: '', win: null };
     if (document.pointerLockElement) document.exitPointerLock();
     show('result', false); show('hud', false);
     screen('vote');
-    $('voteGrid').innerHTML = GD.MAP_KEYS.concat('random').map((k) => {
+    $('voteGrid').innerHTML = opts.concat('random').map((k) => {
       const M = GD.MAPS[k];
       return `<div class="card mapc" data-k="${k}">${M ? `<img src="${mapImg[k]}">` : '<div class="rnd">？</div>'}<div class="nm">${M ? M.name : 'ランダム'}</div><div class="d tiny">${M ? M.desc : 'どれになるかはお楽しみ'}</div><div class="cnt" id="vc_${k}"></div></div>`;
     }).join('');

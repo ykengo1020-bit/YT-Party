@@ -891,19 +891,20 @@ window.Sim = (function () {
           if (ePunch && p.punchCD <= 0) {
             p.punchT = 0.25; p.punchSide ^= 1; p.punchCD = 0.3; p.punchHit = false; p.charging = 0; p.holdPunch = 1;
             p.yaw = lerpAngle(p.yaw, inp.ay, 0.5);
+            if (p.ground) { p.vx += Math.sin(p.yaw) * 2.2; p.vz += Math.cos(p.yaw) * 2.2; } // 踏み込み
             if (!p.ground) { p.vx += Math.sin(p.yaw) * 6; p.vz += Math.cos(p.yaw) * 6; p.dropkick = 0.35; }
             this.emit({ k: 'sfx', n: 'swing' });
           }
           if (b.punch && p.holdPunch) p.charging += dt;
           if (!b.punch && p.holdPunch) {
-            if (p.charging > 0.35) { p.punchT = 0.3; p.punchHit = false; p.charged = Math.min(1, p.charging); p.punchCD = 0.45; this.emit({ k: 'sfx', n: 'swing2' }); }
+            if (p.charging > 0.35) { p.punchT = 0.3; p.punchHit = false; p.charged = Math.min(1, p.charging); p.punchCD = 0.45; p.yaw = lerpAngle(p.yaw, inp.ay, 0.7); if (p.ground) { p.vx += Math.sin(p.yaw) * 5; p.vz += Math.cos(p.yaw) * 5; } this.emit({ k: 'sfx', n: 'swing2' }); }
             p.holdPunch = 0; p.charging = 0;
           }
           // ヒット判定（モーション中盤）
           if (p.punchT > 0 && p.punchT < 0.17 && !p.punchHit) {
             p.punchHit = true;
             const chg = p.charged || 0; p.charged = 0;
-            let heroAdd = 6 + chg * 9, kb = 2.4 + chg * 5.5;
+            let heroAdd = 8 + chg * 11, kb = 3.0 + chg * 6.5;
             if (p.dropkick > 0) { heroAdd += 3; kb += 1.5; }
             // 3連続で当てるとコンボの締め（大きく吹っ飛ぶ）
             const comboOk = this.t - (p.comboT || -9) < 0.9;
@@ -912,14 +913,15 @@ window.Sim = (function () {
             const pm = this.powerMul(p);
             // 音楽ボット：ビートに合うと強化
             if (this.has(p, 'musicbot')) { const ph = (this.t % 0.5); if (ph < 0.12 || ph > 0.38) { const m = p.char === 'hiro' ? 2 : 1.5; heroAdd *= m; kb *= m; this.emit({ k: 'txt', id: p.id, s: '♪Perfect', c: '#ff7ad9' }); } }
+            this.emit({ k: 'swing', id: p.id, s: p.punchSide, c: chg > 0.3 ? 1 : 0, f: fin ? 1 : 0, x: p.x, y: p.y, z: p.z, yw: p.yaw });
             let any = false;
-            for (const q of this.targetsInFront(p, 1.25, 0.35)) {
+            for (const q of this.targetsInFront(p, 1.75 + chg * 0.4, 0.05)) {
               if (q.gBug > 0) q.gFree = (q.gFree || 0) + 1;
               const ok = this.hit(q, p, heroAdd * (chg ? 1.2 : 1), kb * pm, q.x - p.x, q.z - p.z, fin ? 0.5 : 0.3 + chg * 0.25);
               if (ok && !fin && !chg) q.hitstun = Math.max(q.hitstun, 0.32); // 連打がつながる
               any = ok || any;
             }
-            if (this.marsInFront(p, 1.4)) { this.damageMars(p, chg > 0.3 || fin ? 2 : 1); any = true; }
+            if (this.marsInFront(p, 1.9)) { this.damageMars(p, chg > 0.3 || fin ? 2 : 1); any = true; }
             if (any) {
               p.combo = fin || chg ? 0 : (comboOk ? (p.combo || 0) + 1 : 1); p.comboT = this.t;
               if (fin) this.emit({ k: 'txt', id: p.id, s: 'コンボ！', c: '#fbbf24' });
