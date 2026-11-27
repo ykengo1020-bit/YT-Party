@@ -158,55 +158,59 @@ window.Render = (function () {
     return (floorCache[kind] = F[kind]());
   }
   // マップの周りの飾り（当たり判定なし）
+  // マップの周りの飾り。プレイヤーが届く範囲（場外ライン±44m・高さ-14mより上）には置かない＝当たり判定のない物にぶつからない
+  const DECO_R = 50;
   function buildDeco(kind) {
     const g = new THREE.Group();
     const S = (c, o) => std(new THREE.Color(c).convertSRGBToLinear(), o);
-    const box = (w, h, d, m, x, y, z, ry = 0) => { const b = M(new THREE.BoxGeometry(w, h, d), m, x, y, z, g); b.rotation.y = ry; b.castShadow = true; return b; };
+    const box = (w, h, d, m, x, y, z, ry = 0) => { const b = M(new THREE.BoxGeometry(w, h, d), m, x, y, z, g); b.rotation.y = ry; return b; };
     const ring = (r, n, fn) => { for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; fn(Math.cos(a) * r, Math.sin(a) * r, a); } };
+    const far = (a, r = DECO_R + 8) => [Math.cos(a) * r, Math.sin(a) * r];
     if (kind === 'colosseum') {
       const st = S(0xe7d8bf, { r: 0.9 }), st2 = S(0xcdb896, { r: 0.9 });
-      ring(24, 28, (x, z, a) => { M(new THREE.CylinderGeometry(0.9, 1.0, 12, 10), st, x, -3, z, g); box(2.6, 0.8, 2.6, st2, x, 3.4, z, -a); });
-      const wall = M(new THREE.CylinderGeometry(26, 26, 3, 48, 1, true), new THREE.MeshStandardMaterial({ color: 0xd9c7a5, side: THREE.DoubleSide, roughness: 0.95 }), 0, 4.6, 0, g);
-      ring(25.5, 8, (x, z, a) => { const f = M(new THREE.PlaneGeometry(2.2, 4), new THREE.MeshStandardMaterial({ color: [0xef4444, 0x3b82f6][Math.round(a * 10) % 2], side: THREE.DoubleSide }), x * 0.98, 3.2, z * 0.98, g); f.lookAt(0, 3.2, 0); });
-      M(new THREE.CircleGeometry(23, 48), S(0xd6b98c, { r: 1 }), 0, -9, 0, g).rotation.x = -Math.PI / 2;
+      ring(DECO_R + 4, 32, (x, z, a) => { M(new THREE.CylinderGeometry(1.8, 2.0, 30, 10), st, x, -2, z, g); box(5, 1.6, 5, st2, x, 13.5, z, -a); });
+      M(new THREE.CylinderGeometry(DECO_R + 8, DECO_R + 8, 10, 64, 1, true), new THREE.MeshStandardMaterial({ color: 0xd9c7a5, side: THREE.DoubleSide, roughness: 0.95 }), 0, 4, 0, g);
+      ring(DECO_R + 7.5, 10, (x, z, a) => { const f = M(new THREE.PlaneGeometry(4.5, 9), new THREE.MeshStandardMaterial({ color: [0xef4444, 0x3b82f6][Math.round(a * 10) % 2], side: THREE.DoubleSide }), x, 6, z, g); f.lookAt(0, 6, 0); });
+      M(new THREE.CircleGeometry(200, 48), S(0xd6b98c, { r: 1 }), 0, -18, 0, g).rotation.x = -Math.PI / 2;
     } else if (kind === 'docks') {
+      // 海は「落ちたら場外」の水面（当たり判定あり：触れると水しぶきで撃墜）
       const water = M(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x1d7fc4, roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.92 }), 0, -3.5, 0, g); water.rotation.x = -Math.PI / 2; water.userData.water = true;
       const cc = [0xd94b3d, 0x2f7dd1, 0x2f9e5b, 0xe58a1f, 0x9ca3af];
-      for (let k = 0; k < 40; k++) { const s = k % 2 ? 1 : -1, x = s * (18 + (k % 5) * 3.2), z = -20 + ((k * 7) % 40), y = -1.2 + ((k * 3) % 3) * 2.6; box(2.8, 2.5, 6, S(cc[k % 5], { m: 0.3, r: 0.5 }), x, y, z); }
-      for (const s of [-1, 1]) { const y = S(0xfacc15, { m: 0.4, r: 0.4 }); for (const dz of [-1.2, 1.2]) box(0.5, 18, 0.5, y, s * 16, 5, dz - 8 * s); box(0.6, 0.6, 20, y, s * 16, 14, -8 * s + 4); box(3, 2, 3, S(0x1f2937), s * 16, 13, -8 * s - 5); }
-      for (let k = 0; k < 10; k++) box(0.5, 1, 0.5, S(0x374151), (k % 2 ? 1 : -1) * 13.2, -0.5, -12 + k * 2.6);
+      for (let k = 0; k < 48; k++) { const s = k % 2 ? 1 : -1, x = s * (DECO_R + (k % 6) * 6), z = -40 + ((k * 13) % 80), y = -1.5 + ((k * 3) % 3) * 5; box(5.6, 5, 12, S(cc[k % 5], { m: 0.3, r: 0.5 }), x, y, z); }
+      for (const s of [-1, 1]) { const y = S(0xfacc15, { m: 0.4, r: 0.4 }); for (const dz of [-2.4, 2.4]) box(1, 36, 1, y, s * (DECO_R + 4), 14, dz - 16 * s); box(1.2, 1.2, 40, y, s * (DECO_R + 4), 32, -16 * s + 8); box(6, 4, 6, S(0x1f2937), s * (DECO_R + 4), 30, -16 * s - 10); }
     } else if (kind === 'construction') {
       const y = S(0xf59e0b, { m: 0.4, r: 0.4 }), dk = S(0x44403c);
-      // タワークレーン
-      for (const [cx, cz, ry] of [[-20, 12, 0.6], [22, -14, 2.4]]) {
-        for (let h = -8; h < 18; h += 2.4) { box(1.6, 0.15, 1.6, y, cx, h, cz); for (const [ox, oz] of [[-0.75, -0.75], [0.75, -0.75], [-0.75, 0.75], [0.75, 0.75]]) box(0.12, 2.4, 0.12, y, cx + ox, h + 1.2, cz + oz); }
-        const arm = new THREE.Group(); arm.position.set(cx, 19, cz); arm.rotation.y = ry; g.add(arm);
-        M(new THREE.BoxGeometry(22, 0.8, 0.8), y, 6, 0, 0, arm); M(new THREE.BoxGeometry(2, 2, 2), S(0x78716c), -5, -0.6, 0, arm); M(new THREE.BoxGeometry(1.4, 1.4, 1.6), S(0x1f2937), 0, -1, 0, arm);
-        rod([12, 0, 0], [12, -9, 0], 0.04, dk, arm); M(new THREE.BoxGeometry(1.2, 0.8, 1.2), S(0x9ca3af), 12, -9.4, 0, arm);
+      for (const [a, ry] of [[2.5, 0.6], [5.6, 2.4]]) {
+        const [cx, cz] = far(a);
+        for (let h = -16; h < 30; h += 4) { box(3, 0.3, 3, y, cx, h, cz); for (const [ox, oz] of [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]]) box(0.22, 4, 0.22, y, cx + ox, h + 2, cz + oz); }
+        const arm = new THREE.Group(); arm.position.set(cx, 32, cz); arm.rotation.y = ry; g.add(arm);
+        M(new THREE.BoxGeometry(40, 1.5, 1.5), y, -8, 0, 0, arm); M(new THREE.BoxGeometry(4, 4, 4), S(0x78716c), 10, -1.2, 0, arm); M(new THREE.BoxGeometry(2.6, 2.6, 3), S(0x1f2937), 0, -2, 0, arm);
+        rod([-24, 0, 0], [-24, -16, 0], 0.08, dk, arm); M(new THREE.BoxGeometry(2.4, 1.6, 2.4), S(0x9ca3af), -24, -16.8, 0, arm);
       }
-      for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2; const c = M(new THREE.ConeGeometry(0.35, 0.9, 10), S(0xf97316), Math.cos(a) * 17, -2.5, Math.sin(a) * 17, g); }
-      for (let k = 0; k < 6; k++) box(4, 0.3, 0.6, S(0x8b5a2e), -16 + k * 6.4, -6 + (k % 3), 18);
+      M(new THREE.CircleGeometry(200, 40), S(0x9a8f84, { r: 1 }), 0, -18, 0, g).rotation.x = -Math.PI / 2;
+      for (let k = 0; k < 10; k++) { const [x, z] = far(k * 0.63 + 0.3, DECO_R + 10 + (k % 3) * 8); box(8, 10 + (k % 4) * 6, 8, S([0x78716c, 0xa8a29e, 0x57534e][k % 3]), x, -18 + (5 + (k % 4) * 3), z); }
     } else if (kind === 'station') {
+      // 線路はステージの外（遠く）を通る。真ん中の溝は落ちたら場外
       const rail = S(0x9ca3af, { m: 0.9, r: 0.3 }), sl = S(0x5b3a1e);
-      for (const z of [-0.7, 0.7]) box(80, 0.15, 0.12, rail, 0, -0.9, z);
-      for (let x = -40; x <= 40; x += 1.3) box(0.3, 0.12, 2.2, sl, x, -1.02, 0);
-      M(new THREE.PlaneGeometry(90, 8), S(0x6b6b6b, { r: 1 }), 0, -1.1, 0, g).rotation.x = -Math.PI / 2;
-      for (const s of [-1, 1]) for (let x = -24; x <= 24; x += 8) { if (Math.abs(x) < 15) continue; rod([x, -6, s * 10], [x, 4, s * 10], 0.15, S(0x374151), g); M(new THREE.SphereGeometry(0.35, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff7c2 }), x, 4.2, s * 10, g); }
-      const sign = M(new THREE.PlaneGeometry(6, 1.6), new THREE.MeshBasicMaterial({ map: labelTex('stsign', 384, 100, (c, w, h) => { c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.fillStyle = '#16a34a'; c.fillRect(0, 70, w, 30); c.fillStyle = '#111'; c.font = 'bold 48px sans-serif'; c.textAlign = 'center'; c.fillText('ゆうじょう', w / 2, 56); c.fillStyle = '#fff'; c.font = 'bold 20px sans-serif'; c.fillText('YUJO  ←ブレイカーズ　　ライバル→', w / 2, 92); }), side: THREE.DoubleSide }), 0, 6.5, -16, g);
-      rod([-2.5, -4, -16], [-2.5, 5.7, -16], 0.1, S(0x374151), g); rod([2.5, -4, -16], [2.5, 5.7, -16], 0.1, S(0x374151), g);
+      for (const zz of [-DECO_R - 6, DECO_R + 6]) { for (const dz of [-0.7, 0.7]) box(200, 0.15, 0.12, rail, 0, -6, zz + dz); for (let x = -100; x <= 100; x += 1.5) box(0.3, 0.12, 2.2, sl, x, -6.12, zz); box(200, 0.5, 6, S(0x6b6b6b, { r: 1 }), 0, -6.5, zz); }
+      M(new THREE.CircleGeometry(200, 40), S(0x7c8a6b, { r: 1 }), 0, -18, 0, g).rotation.x = -Math.PI / 2;
+      for (let k = 0; k < 12; k++) { const x = -60 + k * 11, zz = (k % 2 ? 1 : -1) * (DECO_R + 2); rod([x, -6, zz], [x, 6, zz], 0.25, S(0x374151), g); M(new THREE.SphereGeometry(0.6, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff7c2 }), x, 6.4, zz, g); }
+      const sign = M(new THREE.PlaneGeometry(14, 3.7), new THREE.MeshBasicMaterial({ map: labelTex('stsign', 384, 100, (c, w, h) => { c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.fillStyle = '#16a34a'; c.fillRect(0, 70, w, 30); c.fillStyle = '#111'; c.font = 'bold 48px sans-serif'; c.textAlign = 'center'; c.fillText('ゆうじょう', w / 2, 56); c.fillStyle = '#fff'; c.font = 'bold 20px sans-serif'; c.fillText('YUJO  ←ブレイカーズ　　ライバル→', w / 2, 92); }), side: THREE.DoubleSide }), 0, 10, -DECO_R - 2, g);
+      rod([-6, -6, -DECO_R - 2], [-6, 8.2, -DECO_R - 2], 0.22, S(0x374151), g); rod([6, -6, -DECO_R - 2], [6, 8.2, -DECO_R - 2], 0.22, S(0x374151), g);
     } else if (kind === 'westown') {
-      M(new THREE.CircleGeometry(160, 40), S(0xe0b277, { r: 1 }), 0, -6, 0, g).rotation.x = -Math.PI / 2;
+      M(new THREE.CircleGeometry(220, 40), S(0xe0b277, { r: 1 }), 0, -18, 0, g).rotation.x = -Math.PI / 2;
       const wd = S(0x9a6a3c, { r: 0.9 }), wd2 = S(0x7a4f2a, { r: 0.9 }), cac = S(0x4d9a4a, { r: 0.8 });
-      for (let k = 0; k < 8; k++) { const s = k % 2 ? 1 : -1, z = -15 + (k >> 1) * 10; box(6, 9 + (k % 3) * 2, 8, k % 3 ? wd : wd2, s * 22, -1.5, z); box(6.4, 1.2, 8.4, wd2, s * 22, 3.6 + (k % 3) * 1, z); }
-      for (let k = 0; k < 12; k++) { const a = k * 2.1, r = 30 + (k * 13) % 40; const x = Math.cos(a) * r, z = Math.sin(a) * r; M(new THREE.CylinderGeometry(0.5, 0.6, 5, 8), cac, x, -3.5, z, g); M(new THREE.CylinderGeometry(0.3, 0.3, 2, 8), cac, x + 0.9, -2.5, z, g); }
-      const tower = new THREE.Group(); tower.position.set(-16, 0, -18); g.add(tower);
-      for (const [x, z] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) rod([x, -6, z], [x * 0.8, 6, z * 0.8], 0.15, wd2, tower);
-      M(new THREE.CylinderGeometry(2.3, 2.3, 3, 14), wd, 0, 7.5, 0, tower); M(new THREE.ConeGeometry(2.6, 1.4, 14), wd2, 0, 9.7, 0, tower);
+      for (let k = 0; k < 10; k++) { const s = k % 2 ? 1 : -1, z = -48 + (k >> 1) * 24; const hgt = 26 + (k % 3) * 5; box(12, hgt, 16, k % 3 ? wd : wd2, s * (DECO_R + 6), -18 + hgt / 2, z); box(12.8, 2, 16.8, wd2, s * (DECO_R + 6), -18 + hgt + 1, z); }
+      for (let k = 0; k < 14; k++) { const [x, z] = far(k * 2.1, DECO_R + 15 + (k * 13) % 40); M(new THREE.CylinderGeometry(1.2, 1.4, 14, 8), cac, x, -11, z, g); M(new THREE.CylinderGeometry(0.7, 0.7, 5, 8), cac, x + 2, -8, z, g); }
+      const tower = new THREE.Group(); const [tx, tz] = far(3.9); tower.position.set(tx, 0, tz); g.add(tower);
+      for (const [x, z] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) rod([x, -18, z], [x * 0.8, 10, z * 0.8], 0.3, wd2, tower);
+      M(new THREE.CylinderGeometry(4.6, 4.6, 6, 14), wd, 0, 13, 0, tower); M(new THREE.ConeGeometry(5.2, 2.8, 14), wd2, 0, 17.4, 0, tower);
     } else if (kind === 'onyx') {
       const nm = [0xa855f7, 0x22d3ee, 0xf472b6];
-      for (let k = 0; k < 6; k++) { const r = M(new THREE.TorusGeometry(20 + k * 4, 0.15, 6, 80), new THREE.MeshBasicMaterial({ color: nm[k % 3] }), 0, -4 - k * 2, 0, g); r.rotation.x = Math.PI / 2; r.userData.spin = (k % 2 ? 1 : -1) * 0.1; }
-      for (let k = 0; k < 18; k++) { const a = k * 0.35 * Math.PI, rr = 22 + (k * 7) % 20; const c = M(new THREE.OctahedronGeometry(1.2 + (k % 3)), std(0x1e1b2e, { m: 0.6, r: 0.2, e: nm[k % 3] }), Math.cos(a) * rr, -2 + (k % 5) * 3, Math.sin(a) * rr, g); c.scale.y = 2; c.userData.bob = k; }
+      for (let k = 0; k < 6; k++) { const r = M(new THREE.TorusGeometry(20 + k * 5, 0.2, 6, 80), new THREE.MeshBasicMaterial({ color: nm[k % 3] }), 0, -17 - k * 2.5, 0, g); r.rotation.x = Math.PI / 2; r.userData.spin = (k % 2 ? 1 : -1) * 0.1; }
+      for (let k = 0; k < 18; k++) { const [x, z] = far(k * 0.35 * Math.PI, DECO_R + 4 + (k * 7) % 30); const c = M(new THREE.OctahedronGeometry(2.4 + (k % 3) * 1.6), std(0x1e1b2e, { m: 0.6, r: 0.2, e: nm[k % 3] }), x, -2 + (k % 5) * 5, z, g); c.scale.y = 2; c.userData.bob = k; }
     }
+    g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
     return g;
   }
   const SKY_DEF = { top: 0x3b2a7a, mid: 0xf08a6a, bot: 0x2a3d6b };
@@ -954,6 +958,10 @@ window.Render = (function () {
   }
   // 演出の時間で少し後に実行（録画でもずれない）
   function later(sec, fn) { let done = false; addFx(new THREE.Group(), sec, (f) => { if (!done && f.life <= 0.02) { done = true; fn(); } }); }
+  function splashFx(e) {
+    ringPulse(e.x, e.y + 0.05, e.z, 0xbfe9ff, 0.4, 3.5, 0.6);
+    for (let i = 0; i < 18; i++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.14 + Math.random() * 0.12, 6, 4), addB(0x9bd8ff, 0.9)); const v = new THREE.Vector3((Math.random() - 0.5) * 6, 6 + Math.random() * 6, (Math.random() - 0.5) * 6); d.position.set(e.x, e.y, e.z); addFx(d, 0.9, (f, k, dt) => { d.position.addScaledVector(v, dt); v.y -= 18 * dt; d.material.opacity = k; }); }
+  }
   // ジグザグの光線
   function zap(a, b, col) {
     const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b), pts = [];
@@ -1270,6 +1278,7 @@ window.Render = (function () {
       else if (e.k === 'djump') { wave(e.x, e.y, e.z, 1.6, 0xffffff); const ch = chars.get(e.id); if (ch) ch.flip = 0.4; }
       else if (e.k === 'smash') { const ch = chars.get(e.id); if (ch) ch.trail = Math.min(1.6, e.p / 25); shake = Math.max(shake, Math.min(0.8, e.p / 60)); }
       else if (e.k === 'swing') swoosh(e);
+      else if (e.k === 'splash') splashFx(e);
       else if (e.k === 'cast') castFx(e);
       else if (e.k === 'gswing') grabSwing(e);
       else if (e.k === 'gcatch') grabCatch(e);

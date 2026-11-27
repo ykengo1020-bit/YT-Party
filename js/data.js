@@ -197,7 +197,7 @@ window.GD = (function () {
         return 0;
       },
       plats: [P(-7.8, -7.8, 3.6, 2.4, 2.4), P(7.8, 7.8, 3.6, 2.4, 2.4), P(-7.8, 7.8, 3.6, 2.4, 2.4), P(7.8, -7.8, 3.6, 2.4, 2.4)] },
-    docks: { name: '港のコンテナ', desc: 'コンテナの通路と海。クレーンの床が行き来する', rivals: true,
+    docks: { name: '港のコンテナ', desc: 'コンテナの通路と海。海に落ちたら即場外', rivals: true, waterY: -3.4,
       style: { cover: 'container', min: 1.4, deco: 'docks', sky: 0x9bd3ff },
       tile: (i, j) => {
         if (i < 1 || i > 9) return null;

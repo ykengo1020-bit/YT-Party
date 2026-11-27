@@ -1131,6 +1131,8 @@ window.Sim = (function () {
     }
     checkFall(p) {
       const lim = HALF + 30;
+      const wy = GD.MAPS[this.map].waterY;
+      if (wy !== undefined && p.y < wy && p.respawn <= 0 && !p.elim) { this.emit({ k: 'splash', x: p.x, y: wy, z: p.z }); this.emit({ k: 'sfx', n: 'ko' }); this.ringOut(p); return; }
       if (p.y < KILL_Y || Math.abs(p.x) > lim || Math.abs(p.z) > lim || p.y > 60) this.ringOut(p);
     }
 
