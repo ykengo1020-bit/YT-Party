@@ -114,6 +114,7 @@
     { v: 'rule_guard', t: 'ガードと頭突き', x: () => `${K('guard')}を長押しすると<b>正面からのパンチをほぼ防げます</b>（青い火花）。ただし掴みは防げません。<br>${K('head')}は頭突き。届く距離は短いけれどヘロヘロ値が大きく上がります。` },
     { v: 'rule_item', t: 'アイテム', x: () => `ステージにはアイテムが湧きます。手ぶらで触れると拾います。<br><b>どのアイテムも ${K('use')} で使う</b>（武器なら撃つ・振る）、${K('drop')}で投げる。武器を持っていても ${K('punch')} は素手のパンチです。<br><table><tr><td>AR</td><td>長押しで連射して押し出す</td></tr><tr><td>SR</td><td>長押しで溜めて、離すと撃つ。大ふっとび</td></tr><tr><td>SG</td><td>近距離で特大ふっとび</td></tr><tr><td>モニター</td><td>振り回してモニターパンチ</td></tr><tr><td>LANケーブル</td><td>投げて相手を5秒縛る</td></tr><tr><td>ゲーミングチェア</td><td>乗って突進</td></tr><tr><td>エナドリ／五苓散／デトックス</td><td>スピードアップ／状態異常回復／状態異常無効</td></tr></table>` },
     { v: null, t: '浮き床と地形', x: () => `ステージには高低差と<b>浮き床</b>があります。浮き床は<b>下からジャンプですり抜けて上に乗れます</b>。<br>浮き床から降りたいときは ${K('guard')} を押しながら ${K('jump')}。<br>動く浮き床は乗っている人を一緒に運びます。段差は普通のジャンプで登れる高さです。` },
+    { v: null, t: 'マップの効果', x: () => `マップによっては特別な効果があります（ロビーの「ルール」→「マップの効果」でオフにもできる）。<table>${GD.MAP_KEYS.filter((k) => GD.MAPS[k].fxName).map((k) => `<tr><td><b>${GD.MAPS[k].name}</b></td><td><b>${GD.MAPS[k].fxName}</b>：${GD.MAPS[k].desc}</td></tr>`).join('')}<tr><td><b>港のコンテナ</b></td><td><b>海</b>：落ちると水しぶきを上げて即場外</td></tr></table>` },
     { v: null, t: 'チーム戦', x: () => `ロビーでホストが<b>「チーム戦」</b>を選ぶと、2〜4チームに分かれて戦えます。<br>自分のカードをクリックするとチームが変わります（ホストはCPUも含めて全員を変えられる）。<br>「味方への攻撃：当たらない」なら、味方にはパンチ・掴み・スキルが当たりません。「当たる」にすると巻き込み注意。<br><b>相手チームを全員脱落させたチームの勝ち</b>。足元の輪と名前の色が自分のチームの色です。` },
     { v: null, t: 'TP・スキル・交換券', x: () => `<b>TPは5秒ごとに1ずつ</b>自動で貯まります（最大30）。相手を落とすと+2、投げると+1。<br>${K('s1')}〜${K('s4')}でキャラごとのスキル（TPを消費）、${K('v')}でキャラ固有アクション。<br>スキルの中身はキャラ選択画面で<b>動画つきで確認</b>できます。<br>相手を3回落とすと<b>アイテム交換券</b>。${K('shop')}で好きなアイテムと交換できます。` },
     { v: null, t: '状態異常', x: () => `スキルで状態異常にかかることがあります。重ねがけされると段階（Lv）が上がり長引きます。<table>${GD.STATUS_KEYS.map((k) => `<tr><td><span class="chip" style="background:${STATUS[k].color}">${STATUS[k].name}</span></td><td>${STATUS_DESC[k]}</td></tr>`).join('')}</table>` },
@@ -337,7 +338,7 @@
   seg('segMode', 'mode', rebalance); seg('segTeams', 'teams', rebalance); seg('segFF', 'ff');
   seg('segCpu', 'cpu'); seg('segLvl', 'lvl');
   // ---------- ルール設定（スマブラ風）----------
-  const RULE_DEF = { mode: 'stock', stock: 2, time: 3, sd: true, kbRate: 1, startHero: 0, tpRate: 1, skills: true, gimmicks: true, phases: true, events: true };
+  const RULE_DEF = { mode: 'stock', stock: 2, time: 3, sd: true, kbRate: 1, startHero: 0, tpRate: 1, skills: true, gimmicks: true, mapfx: true, phases: true, events: true };
   const onoff = (v) => (v ? 'あり' : 'なし');
   const RULE_ROWS = [
     { k: 'mode', name: 'ルール', icon: 'trophy', vals: ['stock', 'time', 'stime'], label: (v) => ({ stock: 'ストック制', time: 'タイム制', stime: 'ストック＋時間' }[v]),
@@ -350,6 +351,7 @@
     { k: 'tpRate', name: 'TPのたまる速さ', icon: 'bolt', vals: [0.5, 1, 1.5, 2, 3], label: (v) => v + '倍', desc: () => '大きいほどスキルをたくさん使える' },
     { k: 'skills', name: 'スキル', icon: 'sparkle', vals: [true, false], label: onoff, desc: (v) => (v ? 'スキル1〜4が使える' : 'パンチと掴みだけで勝負') },
     { k: 'gimmicks', name: 'ステージギミック', icon: 'swirl', vals: [true, false], label: onoff, desc: () => '強風・氷・ベルトコンベア・床崩れなど（1分ごとに変わる）' },
+    { k: 'mapfx', name: 'マップの効果', icon: 'train', vals: [true, false], label: onoff, desc: () => '電車・溶岩の噴火・潮の満ち引き・落雷・バンパー・ワープ・竜巻など' },
     { k: 'phases', name: '時間で進むイベント', icon: 'flame', vals: [true, false], label: onoff, desc: () => '3分でガチ乱闘期（ステージが崩れる）、9分でMars襲来' },
     { k: 'events', name: 'ランダムイベント', icon: 'dice', vals: [true, false], label: onoff, desc: () => '停電・食中毒・アイテム配布・隕石など' },
   ];
@@ -375,6 +377,7 @@
     if (R.tpRate !== 1) chips.push('TP' + R.tpRate + '倍');
     if (!R.skills) chips.push('スキルなし');
     if (!R.gimmicks) chips.push('ギミックなし');
+    if (R.mapfx === false) chips.push('マップの効果なし');
     if (!R.phases) chips.push('進行イベントなし');
     if (!R.events) chips.push('ランダムイベントなし');
     const it = L.itemRate === 0 || !L.items.length ? 'アイテムなし' : `アイテム${L.items.length}種・${['なし', '少なめ', '普通', '多め'][L.itemRate]}`;

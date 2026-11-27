@@ -25,6 +25,7 @@
     check: `<circle cx="24" cy="24" r="17" fill="#3ee089" ${S}/><path d="M15 25l6 6 12-13" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`,
     reset: `<path d="M12 22a12 12 0 1 1 4 11" fill="none" ${S}/><path d="M6 16l6 7 7-5" fill="none" ${S}/>`,
     play: `<circle cx="24" cy="24" r="17" fill="#ff4d8d" ${S}/><path d="M20 16l12 8-12 8z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>`,
+    train: `<rect x="8" y="9" width="32" height="26" rx="7" fill="#3ee089" ${S}/><rect x="13" y="14" width="22" height="9" rx="2" fill="#9be7ff" ${S}/><circle cx="16" cy="29" r="2.4" fill="#fff8ec"/><circle cx="32" cy="29" r="2.4" fill="#fff8ec"/><path d="M14 35l-4 6M34 35l4 6M9 41h30" fill="none" ${S}/>`,
     sword: `<path d="M34 6l8 0 0 8-20 20-8-8z" fill="#e5e7eb" ${S}/><path d="M12 24l12 12M10 32l6 6M8 40l4-4" ${S}/><path d="M12 24l12 12" stroke="#a16207" stroke-width="6" stroke-linecap="round" opacity="0"/>`,
   };
   window.ICON = (name, size = 26, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true">${P[name] || P.star}</svg>`;

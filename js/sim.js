@@ -19,7 +19,7 @@ window.Sim = (function () {
   class Game {
     constructor(opts) {
       // スマブラ風のルール設定（ロビーの「ルール」画面で変更）
-      this.rules = { mode: 'stock', stock: opts.lives || 2, time: 3, kbRate: 1, startHero: 0, tpRate: 1, skills: true, gimmicks: true, phases: true, events: true, sd: true, ...(opts.rules || {}) };
+      this.rules = { mode: 'stock', stock: opts.lives || 2, time: 3, kbRate: 1, startHero: 0, tpRate: 1, skills: true, gimmicks: true, mapfx: true, phases: true, events: true, sd: true, ...(opts.rules || {}) };
       const RU = this.rules;
       RU.stock = clamp(RU.stock | 0 || 2, 1, 9); RU.kbRate = clamp(+RU.kbRate || 1, 0.3, 3); RU.tpRate = clamp(+RU.tpRate || 1, 0.25, 5); RU.startHero = clamp(RU.startHero | 0, 0, 999);
       this.lives = RU.mode === 'time' ? 99 : RU.stock;
@@ -44,7 +44,161 @@ window.Sim = (function () {
       this.banner = null;
       this.buildTiles();
       this.plats = (GD.MAPS[this.map].plats || []).map((q) => ({ ...q, bx: q.x, bz: q.z, dx: 0, dz: 0 }));
+      this.initHazards();
       this.setGimmick(RU.gimmicks ? pick(['wind', 'ice', 'conveyor', 'crumble', 'lagbridge', 'rack']) : 'none');
+    }
+
+    // ---------- マップの効果（電車・溶岩・潮・雷・バンパー・ジャンプ台・ワープ・竜巻・低重力）----------
+    initHazards() {
+      const M = GD.MAPS[this.map];
+      this.hz = (this.rules.mapfx === false ? [] : M.fx || []).map((f) => ({ ...f, t: f.first ?? f.every ?? 10, st: 'idle', n: 0 }));
+      this.gravK = M.gravity || 1;
+      this.lava = M.lavaY;
+      this.props = (M.props || []).map((b) => ({ ...b }));
+      this.kills = M.killZones || [];
+      this.tide = this.hz.find((h) => h.type === 'tide') || null;
+      if (M.spring) for (const t of this.tiles) if (!t.none && M.spring(t.i, t.j)) t.spring = true;
+    }
+    hzAlive() { return this.players.filter((p) => !p.elim && p.respawn <= 0); }
+    updateHazards(dt) {
+      const P = this.hzAlive();
+      for (const h of this.hz) {
+        if (h.type === 'train') {
+          // 一定時間ごとに警報 → 電車が線路を通過。ひかれると大きく吹っ飛ぶ
+          h.t -= dt;
+          if (h.st === 'idle' && h.t <= h.warn) { h.st = 'warn'; h.dir = rnd() < 0.5 ? 1 : -1; this.say('カンカンカン…電車が来ます！線路から離れて！', '#facc15'); this.emit({ k: 'sfx', n: 'phase' }); }
+          if (h.st === 'warn' && h.t <= 0) { h.st = 'run'; h.x = -h.dir * (HALF + 30 + h.len / 2); h.n++; }
+          if (h.st === 'run') {
+            h.x += h.dir * h.speed * dt;
+            for (const p of P) {
+              if (p.trainN === h.n || p.inv > 0) continue;
+              if (Math.abs(p.z - h.z) < h.hw + R && p.y < h.h && p.y > -4 && Math.abs(p.x - h.x) < h.len / 2 + R) {
+                p.trainN = h.n; this.hit(p, null, 50, 40, h.dir, (p.z - h.z) * 0.15, 0.35, { unblock: true, force: true });
+                this.emit({ k: 'txt', id: p.id, s: '電車にひかれた！', c: '#facc15' }); this.emit({ k: 'boom', x: p.x, y: p.y + 1, z: p.z });
+              }
+            }
+            if (Math.abs(h.x) > HALF + 32 + h.len / 2) { h.st = 'idle'; h.t = h.every + rnd() * (h.jit || 0); }
+          }
+        } else if (h.type === 'erupt') {
+          // 床が赤く光って、数秒後に火柱
+          h.t -= dt;
+          if (h.st === 'idle' && h.t <= 0) {
+            const c = this.tiles.filter((t) => t.on && !t.gone && t.ring >= 0);
+            h.tiles = []; for (let k = 0; k < h.n0 && c.length; k++) h.tiles.push(c.splice((rnd() * c.length) | 0, 1)[0]);
+            // 人がいる床を1つは狙う
+            const v = P.length ? pick(P) : null; if (v) { const vt = this.tiles.find((t) => t.on && Math.abs(t.x - v.x) < TS / 2 && Math.abs(t.z - v.z) < TS / 2); if (vt && !h.tiles.includes(vt)) h.tiles[0] = vt; }
+            h.tiles.forEach((t) => (t.erupt = 1)); h.st = 'warn'; h.t = h.warn;
+          } else if (h.st === 'warn' && h.t <= 0) {
+            for (const t of h.tiles) {
+              t.erupt = 0; this.emit({ k: 'erupt', x: t.x, y: t.top, z: t.z });
+              for (const p of P) if (Math.abs(p.x - t.x) < TS / 2 + 0.3 && Math.abs(p.z - t.z) < TS / 2 + 0.3 && p.y < t.top + 6 && p.y > t.top - 1) this.hit(p, null, 22, 13, p.x - t.x + (rnd() - 0.5) * 0.2, p.z - t.z + (rnd() - 0.5) * 0.2, 1.1, { unblock: true });
+            }
+            h.st = 'idle'; h.t = h.every + rnd() * 2;
+          }
+        } else if (h.type === 'tide') {
+          // 潮の満ち引き：低い床が沈む
+          h.t += dt; const T = h.period, ph = h.t % T, lo = h.lo, hi = h.hi;
+          const rise = T * 0.5, top = T * 0.62, fall = T * 0.85;
+          const prev = h.lvl;
+          h.lvl = ph < rise ? lo : ph < top ? lo + (hi - lo) * ((ph - rise) / (top - rise)) : ph < fall ? hi : hi - (hi - lo) * ((ph - fall) / (T - fall));
+          if (ph >= rise - 5 && ph - dt < rise - 5) this.say('満潮が来る！高い所へ逃げろ！', '#38bdf8');
+          h.rising = ph >= rise - 5 && ph < fall;
+          if (prev !== undefined && prev < hi && h.lvl >= hi) this.emit({ k: 'sfx', n: 'phase' });
+        } else if (h.type === 'storm') {
+          // 雷：予告の円が出て、少しあとに落雷
+          h.t -= dt;
+          h.marks = (h.marks || []).filter((m) => {
+            m.t -= dt; if (m.t > 0) return true;
+            this.emit({ k: 'bolt', x: m.x, z: m.z, y: m.y });
+            for (const p of P) if (len2(p.x - m.x, p.z - m.z) < h.r + R && p.y < m.y + 8) { this.hit(p, null, 26, 11, p.x - m.x + 0.01, p.z - m.z, 0.8, { unblock: true }); p.stun = Math.max(p.stun, 0.7); this.emit({ k: 'txt', id: p.id, s: 'ビリビリ！', c: '#fde047' }); }
+            return false;
+          });
+          if (h.t <= 0) {
+            h.t = h.every + rnd() * 2;
+            for (let k = 0; k < h.n0; k++) {
+              const v = P.length && rnd() < 0.7 ? pick(P) : null;
+              const tl = pick(this.tiles.filter((t) => t.on && !t.gone)) || { x: 0, z: 0, top: 0 };
+              const x = v ? v.x + (rnd() - 0.5) * 3 : tl.x, z = v ? v.z + (rnd() - 0.5) * 3 : tl.z;
+              const gt = this.tiles.find((t) => t.on && Math.abs(t.x - x) < TS / 2 && Math.abs(t.z - z) < TS / 2);
+              h.marks.push({ x, z, y: gt ? gt.top : 0, t: h.warn });
+            }
+          }
+        } else if (h.type === 'bumper') {
+          // 丸いバンパー：ぶつかると大きくはじかれる（上に乗っても跳ねる）
+          for (const b of h.list) {
+            b.f = Math.max(0, (b.f || 0) - dt);
+            const top = this.bumperTop(b);
+            for (const p of P) {
+              const dx = p.x - b.x, dz = p.z - b.z, d = len2(dx, dz);
+              if (d > b.r + R || p.y > top + 0.05 || p.y + H < top - h.h) continue;
+              if (p.y >= top - 0.35 && p.vy <= 0.5) { p.y = top; p.vy = 17; p.vx += dx * 3; p.vz += dz * 3; p.airJ = 1; }
+              else { const nx = dx / (d || 1), nz = dz / (d || 1); p.x = b.x + nx * (b.r + R + 0.02); p.z = b.z + nz * (b.r + R + 0.02); p.vx = nx * h.kb; p.vz = nz * h.kb; p.vy = Math.max(p.vy, 6); p.hitstun = Math.max(p.hitstun, 0.25); p.hero = clamp(p.hero + 3, 0, 999); }
+              if (b.f <= 0) { b.f = 0.25; this.emit({ k: 'bump', x: b.x, z: b.z, y: top, i: h.list.indexOf(b) }); }
+            }
+          }
+        } else if (h.type === 'portal') {
+          // ワープ：入ると相方の出口へ（勢いはそのまま）
+          for (const p of P) {
+            p.portCD = Math.max(0, (p.portCD || 0) - dt);
+            if (p.portCD > 0) continue;
+            let done = false;
+            for (const pr of h.pairs) for (let s = 0; s < 2 && !done; s++) {
+              const a = pr[s], b = pr[1 - s];
+              if (len2(p.x - a[0], p.z - a[1]) < 0.85 && Math.abs(p.y - this.groundY(a[0], a[1])) < 1.2) {
+                this.emit({ k: 'warp', x: a[0], z: a[1], y: p.y, c: pr[2] }); p.x = b[0]; p.z = b[1]; p.y = this.groundY(b[0], b[1]) + 0.05; p.portCD = 1.2; p.ledge = null;
+                this.emit({ k: 'warp', x: b[0], z: b[1], y: p.y, c: pr[2] }); this.emit({ k: 'sfx', n: 'pickup' }); done = true;
+              }
+            }
+          }
+        } else if (h.type === 'tornado') {
+          // 竜巻：ステージをうろうろ。近くの人を吸い込んで、真ん中で放り出す
+          h.t += dt; h.x = Math.sin(h.t * h.sp) * h.ax; h.z = Math.sin(h.t * h.sp * 1.37 + 1) * h.az;
+          for (const p of P) {
+            const dx = p.x - h.x, dz = p.z - h.z, d = len2(dx, dz) || 0.01;
+            if (d > h.r || p.y > 9) continue;
+            const k = 1 - d / h.r;
+            p.vx += (-dx / d * 9 + -dz / d * 7) * k * dt * 3; p.vz += (-dz / d * 9 + dx / d * 7) * k * dt * 3; p.vy += 14 * k * dt * 2;
+            if (d < 1.3 && !(p.tornCD > 0)) { p.tornCD = 1.5; this.hit(p, null, 10, 12, dx + 0.01, dz, 1.0, { unblock: true }); this.emit({ k: 'txt', id: p.id, s: '竜巻に飛ばされた！', c: '#a7f3d0' }); }
+          }
+          for (const p of P) if (p.tornCD > 0) p.tornCD -= dt;
+        }
+      }
+      // ジャンプ台
+      for (const p of P) {
+        if (p.ground && p.groundTile && p.groundTile.spring && p.vy <= 0.01 && !p.grab) {
+          p.vy = 21; p.ground = false; p.airJ = 1; p.y += 0.05;
+          this.emit({ k: 'spring', x: p.groundTile.x, y: p.groundTile.top, z: p.groundTile.z });
+        }
+      }
+    }
+    bumperTop(b) { const t = this.tiles.find((q) => Math.abs(q.x - b.x) < TS / 2 && Math.abs(q.z - b.z) < TS / 2 && q.on); return (t ? t.top : 0) + 1.4; }
+    groundY(x, z) { const t = this.tiles.find((q) => q.on && !q.gone && Math.abs(q.x - x) < TS / 2 && Math.abs(q.z - z) < TS / 2); return t ? t.top : 0; }
+    // CPUが避けるための危険な場所（逃げ先を返す）
+    dangerAt(x, z, y) {
+      for (const h of this.hz) {
+        if (h.type === 'train' && h.st !== 'idle' && Math.abs(z - h.z) < h.hw + 1.6) return { gx: x, gz: h.z + Math.sign(z - h.z || 1) * (h.hw + 3.5) };
+        if (h.type === 'storm' && h.marks) for (const m of h.marks) if (len2(x - m.x, z - m.z) < h.r + 1.2) { const d = len2(x - m.x, z - m.z) || 1; return { gx: m.x + (x - m.x) / d * (h.r + 3), gz: m.z + (z - m.z) / d * (h.r + 3) }; }
+        if (h.type === 'erupt' && h.st === 'warn') for (const t of h.tiles) if (Math.abs(x - t.x) < TS / 2 + 0.6 && Math.abs(z - t.z) < TS / 2 + 0.6) return { gx: t.x + Math.sign(x - t.x || 1) * TS * 1.2, gz: t.z + Math.sign(z - t.z || 1) * TS * 1.2 };
+        if (h.type === 'tornado' && len2(x - h.x, z - h.z) < h.r + 1) { const d = len2(x - h.x, z - h.z) || 1; return { gx: h.x + (x - h.x) / d * (h.r + 4), gz: h.z + (z - h.z) / d * (h.r + 4) }; }
+        if (h.type === 'tide' && h.rising && y < h.hi + 0.3) {
+          let best = null, bd = 1e9; for (const t of this.tiles) if (t.on && !t.gone && t.top >= h.hi + 0.3) { const d = len2(t.x - x, t.z - z); if (d < bd) { bd = d; best = t; } }
+          if (best) return { gx: best.x, gz: best.z };
+        }
+      }
+      return null;
+    }
+    hzSnap() {
+      const r2 = (v) => Math.round(v * 100) / 100;
+      return this.hz.map((h) => {
+        if (h.type === 'train') return { k: 'train', x: r2(h.x || 0), z: h.z, st: h.st === 'run' ? 2 : h.st === 'warn' ? 1 : 0, d: h.dir || 1, len: h.len, hw: h.hw };
+        if (h.type === 'tide') return { k: 'tide', l: r2(h.lvl ?? h.lo), r: h.rising ? 1 : 0 };
+        if (h.type === 'storm') return { k: 'storm', m: (h.marks || []).map((m) => [r2(m.x), r2(m.z), r2(m.y), r2(m.t)]), r: h.r };
+        if (h.type === 'bumper') return { k: 'bumper', b: h.list.map((b) => [b.x, b.z, b.r, r2(this.bumperTop(b)), b.f > 0 ? 1 : 0]), h: h.h };
+        if (h.type === 'portal') return { k: 'portal', p: h.pairs.map((pr) => [pr[0][0], pr[0][1], r2(this.groundY(pr[0][0], pr[0][1])), pr[1][0], pr[1][1], r2(this.groundY(pr[1][0], pr[1][1])), pr[2]]) };
+        if (h.type === 'tornado') return { k: 'tornado', x: r2(h.x || 0), z: r2(h.z || 0), r: h.r };
+        if (h.type === 'erupt') return { k: 'erupt' };
+        return { k: h.type };
+      });
     }
 
     // ---------- ステージ ----------
@@ -64,6 +218,7 @@ window.Sim = (function () {
       const out = [];
       for (const t of this.tiles) if (t.on && !t.gone) out.push({ x: t.x, z: t.z, w: TS / 2, d: TS / 2, top: t.top, bot: Math.min(t.top - 1.2, -1.2), tile: t });
       for (const b of this.boxes) out.push(b);
+      for (const b of this.props || []) out.push(b);
       return out;
     }
     setGimmick(g) {
@@ -152,7 +307,7 @@ window.Sim = (function () {
         let best = null, bd = 1e9;
         for (const t of cand) { if (used.has(t)) continue; const d = len2(t.x - gx, t.z - gz); if (d < bd) { bd = d; best = t; } }
         used.add(best);
-        p.x = best.x; p.z = best.z; p.y = best.top + 0.5; p.yaw = Math.atan2(-p.x, -p.z);
+        p.x = best.x; p.z = best.z; p.y = best.top + 0.5; p.yaw = Math.atan2(-p.x, -p.z); p.portCD = 2;
       });
       if (this.rules.startHero) this.players.forEach((p) => { p.hero = this.rules.startHero; p.nextStun = Math.floor(p.hero / 50) * 50 + 50; });
       this.say('ファイト！', '#fde047');
@@ -565,7 +720,7 @@ window.Sim = (function () {
       const c = this.tiles.filter((t) => t.on && !t.gone && t.ring >= 1);
       const t = c.length ? pick(c) : { x: 0, z: 0, top: 0 };
       p.x = t.x; p.z = t.z; p.y = t.top + 7; p.vx = p.vy = p.vz = 0;
-      p.inv = this.t >= T.GACHI ? 0 : 2;
+      p.inv = this.t >= T.GACHI ? 0 : 2; p.portCD = 1.5;
       this.emit({ k: 'txt', id: p.id, s: '復帰！', c: '#a7f3d0' });
     }
 
@@ -759,6 +914,7 @@ window.Sim = (function () {
       }
       this.updatePlats(dt);
       this.updateStage(dt);
+      this.updateHazards(dt);
       this.updateMars(dt);
       if (this.over) return;
 
@@ -1073,7 +1229,7 @@ window.Sim = (function () {
 
     integrate(p, dt) {
       if (p.grabbedBy) { p.ground = false; this.checkFall(p); return; }
-      p.vy += GRAV * dt * (p.scy > 0 ? 0.3 : 1);
+      p.vy += GRAV * this.gravK * dt * (p.scy > 0 ? 0.3 : 1);
       if (p.vy < -30) p.vy = -30;
       const oy = p.y;
       if (p.onPlat >= 0 && this.plats[p.onPlat]) { p.x += this.plats[p.onPlat].dx; p.z += this.plats[p.onPlat].dz; }
@@ -1133,6 +1289,12 @@ window.Sim = (function () {
       const lim = HALF + 30;
       const wy = GD.MAPS[this.map].waterY;
       if (wy !== undefined && p.y < wy && p.respawn <= 0 && !p.elim) { this.emit({ k: 'splash', x: p.x, y: wy, z: p.z }); this.emit({ k: 'sfx', n: 'ko' }); this.ringOut(p); return; }
+      // 感電する線路など、触れたら撃墜の場所
+      for (const kz of this.kills) if (p.y < kz.y && p.x > kz.x0 && p.x < kz.x1 && p.z > kz.z0 && p.z < kz.z1 && p.respawn <= 0 && !p.elim) { this.emit({ k: 'bolt', x: p.x, y: kz.y, z: p.z }); this.emit({ k: 'txt', id: p.id, s: kz.msg || 'アウト！', c: '#fde047' }); this.ringOut(p); return; }
+      // 溶岩に落ちたら撃墜
+      if (this.lava !== undefined && p.y < this.lava && p.respawn <= 0 && !p.elim) { this.emit({ k: 'erupt', x: p.x, y: this.lava, z: p.z, small: 1 }); this.ringOut(p); return; }
+      // 満潮で沈んだら撃墜
+      if (this.tide && p.y < this.tide.lvl - 0.25 && p.respawn <= 0 && !p.elim && !p.grabbedBy) { this.emit({ k: 'splash', x: p.x, y: this.tide.lvl, z: p.z }); this.emit({ k: 'txt', id: p.id, s: '波にさらわれた！', c: '#38bdf8' }); this.ringOut(p); return; }
       if (p.y < KILL_Y || Math.abs(p.x) > lim || Math.abs(p.z) > lim || p.y > 60) this.ringOut(p);
     }
 
@@ -1199,10 +1361,10 @@ window.Sim = (function () {
     snapshot() {
       const r2 = (v) => Math.round(v * 100) / 100;
       return {
-        t: r2(this.t), g: this.gimmick, ph: this.phase, wd: r2(this.windDir), bo: this.blackout > 0 ? 1 : 0, lives: this.lives, ru: { mo: this.rules.mode, tl: this.timeLimit, sd: this.sd ? 1 : 0, ph: this.rules.phases ? 1 : 0 },
+        t: r2(this.t), g: this.gimmick, ph: this.phase, wd: r2(this.windDir), bo: this.blackout > 0 ? 1 : 0, lives: this.lives, hz: this.hzSnap(), ru: { mo: this.rules.mode, tl: this.timeLimit, sd: this.sd ? 1 : 0, ph: this.rules.phases ? 1 : 0 },
         mp: this.map, tmode: this.teamMode ? 1 : 0, sh: this.shopList,
         pl: this.plats.map((q) => [Math.round(q.x * 100) / 100, Math.round(q.z * 100) / 100, q.w, q.d, q.y]),
-        tl: this.tiles.map((t) => (t.none ? -200 : t.gone ? -99 : t.on ? r2(t.top) : -50) + (t.shake > 0 ? 1000 : 0) + (t.blink > 2 || (t.warn && !t.gone) ? 2000 : 0)),
+        tl: this.tiles.map((t) => (t.none ? -200 : t.gone ? -99 : t.on ? r2(t.top) : -50) + (t.shake > 0 ? 1000 : 0) + (t.blink > 2 || (t.warn && !t.gone) || t.erupt ? 2000 : 0)),
         bx: this.boxes.map((b) => [r2(b.x), r2(b.z), b.w, b.d, r2(b.top), r2(b.bot)]),
         it: this.items.map((i) => [i.id, i.type, r2(i.x), r2(i.y), r2(i.z)]),
         pr: this.proj.map((p) => [p.id, p.k === 'lan' ? 'lan' : p.type, r2(p.x), r2(p.y), r2(p.z)]),

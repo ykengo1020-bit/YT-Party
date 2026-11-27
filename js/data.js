@@ -217,16 +217,17 @@ window.GD = (function () {
         return 0;
       },
       plats: [P(0, 0, 3.8, 9, 1.0), P(0, 0, 5.6, 1.0, 9), P(-7.8, -7.8, 1.8, 2.4, 2.4, { az: 1, r: 3, sp: 0.6 }), P(7.8, 7.8, 1.8, 2.4, 2.4, { ax: 1, r: 3, sp: 0.6, ph: 1.5 })] },
-    station: { name: '駅のホーム', desc: '2つのホームの間を電車が走る。陸橋で渡れる', rivals: true,
+    station: { name: '駅のホーム', desc: 'ときどき電車が線路を通過！ひかれると大きく吹っ飛ぶ', rivals: true, fxName: '電車', railRow: 5,
+      props: [-1, 1].flatMap((sx) => [-1, 1].map((sz) => ({ x: sx * 15.6, z: sz * 2.4, w: 0.15, d: 0.15, top: 2.7, bot: -1.2 }))),
+      fx: [{ type: 'train', z: 0, every: 18, jit: 8, first: 12, warn: 4, speed: 50, len: 24, hw: 1.5, h: 3.2 }],
       style: { cover: 'pillar', min: 1.4, deco: 'station', sky: 0xb9e6ff },
       tile: (i, j) => {
-        if (j === 5) return null;                                               // 線路
-        if (j === 4 || j === 6) return i % 2 === 0 ? 0 : null;                  // 枕木のすき間
+        if (j >= 4 && j <= 6) return 0;                                         // 線路（真ん中の列を電車が通る）
         if ((i === 2 || i === 5 || i === 8) && (j === 1 || j === 9)) return 2.4; // 柱
         if ((i === 3 && j === 2) || (i === 7 && j === 8)) return 1.0;           // ベンチ
         return 0.6;
       },
-      plats: [P(0, 0, 0.9, 7.8, 2.2, { ax: 1, r: 9.5, sp: 0.3 }), P(-10.4, 0, 3.0, 2.6, 8), P(10.4, 0, 3.0, 2.6, 8)] },
+      plats: [P(-10.4, 0, 3.4, 2.6, 8), P(10.4, 0, 3.4, 2.6, 8), P(0, 0, 4.6, 2.6, 2.6)] },
     westown: { name: '西部の町', desc: '大通りと建物の屋根。たるの陰に隠れろ', rivals: true,
       style: { cover: 'wood', min: 1.4, deco: 'westown', sky: 0xffc98a },
       tile: (i, j) => {
@@ -249,6 +250,97 @@ window.GD = (function () {
         return d <= 1 ? 0.6 : 0;
       },
       plats: [P(0, 0, 2.8, 2.2, 2.2, { circle: true, r: 6, sp: 0.5 }), P(0, 0, 4.4, 2.2, 2.2, { circle: true, r: 6, sp: 0.5, ph: 3.14 })] },
+    // ---- マップの効果つきステージ ----
+    volcano: { name: '火山の火口', desc: '真ん中は溶岩。床が赤く光ったら火柱が噴き上がる', fxName: '溶岩＋噴火',
+      style: { cover: 'basalt', min: 1.2, deco: 'volcano', sky: 0xff8a5c }, lavaY: -2.2,
+      fx: [{ type: 'erupt', every: 5.5, first: 8, warn: 1.8, n0: 3 }],
+      tile: (i, j) => {
+        const d = Math.max(Math.abs(i - 5), Math.abs(j - 5));
+        if (d <= 1 || d > 5) return null;
+        if (d === 5 && (i + j) % 3 === 0) return null;
+        if ((i === 1 || i === 9) && (j === 1 || j === 9)) return 1.6;
+        if (d === 2) return (i + j) % 2 ? 0.4 : 0;
+        return d === 5 ? 0.8 : 0;
+      },
+      plats: [P(0, 0, 3.2, 3.6, 1.4, { ax: 1, r: 3.5, sp: 0.5 }), P(0, 0, 5.2, 1.4, 3.6, { az: 1, r: 3.5, sp: 0.5, ph: 1.5 })] },
+    beach: { name: '潮だまりビーチ', desc: '潮が満ちると低い砂浜が沈む！岩の上へ逃げろ', fxName: '潮の満ち引き',
+      style: { cover: 'sand', min: 1.0, deco: 'beach', sky: 0x7dd3fc },
+      fx: [{ type: 'tide', period: 44, lo: -2.4, hi: 0.4, first: -18 }],
+      tile: (i, j) => {
+        const r = Math.min(i, j, 10 - i, 10 - j);
+        if (r === 0 && (i + j) % 2) return null;
+        if ((i === 2 && j === 2) || (i === 8 && j === 8)) return 2.2;
+        if ((i === 2 && j === 8) || (i === 8 && j === 2)) return 1.4;
+        if (i === 5 && j === 5) return 2.8;
+        if (Math.abs(i - 5) + Math.abs(j - 5) === 1) return 1.4;
+        return 0;
+      },
+      plats: [P(-7.8, 0, 3.4, 2.6, 2.6), P(7.8, 0, 3.4, 2.6, 2.6), P(0, -7.8, 3.8, 2.6, 2.6, { ax: 1, r: 4, sp: 0.4 })] },
+    storm: { name: '雷雲の屋上', desc: '足元に円が出たら雷が落ちる！当たるとしびれる', fxName: '落雷',
+      style: { cover: 'concrete', min: 1.2, deco: 'storm', sky: 0x64748b },
+      fx: [{ type: 'storm', every: 4.5, first: 6, warn: 1.6, n0: 3, r: 1.9 }],
+      tile: (i, j) => {
+        if ((i === 3 || i === 7) && (j === 3 || j === 7)) return null;
+        if (i === 5 && j === 5) return 1.6;
+        if ((i === 0 || i === 10) && (j === 0 || j === 10)) return 2.0;
+        if (i === 5 || j === 5) return 0.5;
+        return 0;
+      },
+      plats: [P(-5.2, -5.2, 3.0, 2.6, 2.6), P(5.2, 5.2, 3.0, 2.6, 2.6), P(5.2, -5.2, 3.0, 2.6, 2.6), P(-5.2, 5.2, 3.0, 2.6, 2.6)] },
+    pinball: { name: 'ピンボール台', desc: '光るバンパーにぶつかると大きくはじかれる', fxName: 'バンパー',
+      style: { cover: 'neon', min: 9, deco: 'pinball', sky: 0x312e81 },
+      fx: [{ type: 'bumper', kb: 19, h: 1.4, list: [{ x: 0, z: 0, r: 1.0 }, { x: -5.2, z: -5.2, r: 0.9 }, { x: 5.2, z: -5.2, r: 0.9 }, { x: -5.2, z: 5.2, r: 0.9 }, { x: 5.2, z: 5.2, r: 0.9 }, { x: 0, z: -10.4, r: 0.8 }, { x: 0, z: 10.4, r: 0.8 }] }],
+      tile: (i, j) => {
+        if (i < 1 || i > 9) return null;
+        if ((j === 0 || j === 10) && (i < 3 || i > 7)) return null;
+        return 0;
+      },
+      plats: [P(-9.1, 0, 3.0, 2.6, 5.2), P(9.1, 0, 3.0, 2.6, 5.2)] },
+    spring: { name: 'トランポリン公園', desc: '矢印の床に乗ると大ジャンプ。空中の浮き床へ', fxName: 'ジャンプ台',
+      style: { cover: 'grass', min: 1.2, deco: 'spring', sky: 0xa7f3d0 },
+      spring: (i, j) => ((i === 2 || i === 8) && (j === 2 || j === 8)) || (i === 5 && j === 5),
+      tile: (i, j) => {
+        const r = Math.min(i, j, 10 - i, 10 - j);
+        if (r === 0) return (i + j) % 4 === 0 ? 0 : null;
+        if ((i === 3 || i === 7) && j === 5) return null;
+        if ((j === 3 || j === 7) && i === 5) return null;
+        if ((i === 1 || i === 9) && j === 5) return 1.4;
+        return 0;
+      },
+      plats: [P(-7.8, -7.8, 6.0, 2.6, 2.6), P(7.8, 7.8, 6.0, 2.6, 2.6), P(-7.8, 7.8, 6.0, 2.6, 2.6), P(7.8, -7.8, 6.0, 2.6, 2.6), P(0, 0, 7.5, 5.2, 2.6, { ax: 1, r: 4, sp: 0.45 })] },
+    moon: { name: '月面基地', desc: '重力が弱くてふわふわ。高く跳べるけど落ちにくい', fxName: '低重力', gravity: 0.5,
+      style: { cover: 'moon', min: 1.2, deco: 'moon', sky: 0x0f172a },
+      tile: (i, j) => {
+        const r = Math.min(i, j, 10 - i, 10 - j);
+        if (r === 0 && (i + j) % 3 !== 0) return null;
+        if ((i === 3 && j === 6) || (i === 7 && j === 4) || (i === 6 && j === 7)) return null; // クレーター
+        if ((i === 2 || i === 8) && (j === 2 || j === 8)) return 2.4;
+        if (i === 5 && j === 5) return 1.2;
+        return 0;
+      },
+      plats: [P(0, -7.8, 4.5, 5.2, 2.0), P(0, 7.8, 4.5, 5.2, 2.0), P(0, 0, 8, 2.6, 2.6, { circle: true, r: 6, sp: 0.3 })] },
+    portal: { name: 'ワープ迷宮', desc: '4つの島をワープゲートでつなぐ。同じ色の門へ飛ぶ', fxName: 'ワープ',
+      style: { cover: 'neon', min: 9, deco: 'portal', sky: 0x1e1b4b },
+      fx: [{ type: 'portal', pairs: [[[-7.8, -7.8], [7.8, 7.8], 0x22d3ee], [[7.8, -7.8], [-7.8, 7.8], 0xf472b6], [[-5.2, 0], [5.2, 0], 0xfacc15]] }],
+      tile: (i, j) => {
+        const ci = i <= 3 ? 0 : i >= 7 ? 2 : 1, cj = j <= 3 ? 0 : j >= 7 ? 2 : 1;
+        if (ci !== 1 && cj !== 1) return (Math.min(i, j, 10 - i, 10 - j) === 0 && (i + j) % 2) ? null : 0; // 四隅の島
+        if ((i === 3 || i === 7) && j === 5) return 0.3; // ワープ台
+        if (i === 5 && j >= 4 && j <= 6) return 0.6; // 真ん中の島
+        return null;
+      },
+      plats: [P(0, -9.1, 2.8, 3.6, 1.4), P(0, 9.1, 2.8, 3.6, 1.4), P(-9.1, 0, 2.8, 1.4, 3.6), P(9.1, 0, 2.8, 1.4, 3.6)] },
+    tornado: { name: '竜巻の草原', desc: '竜巻がうろうろ。近づくと吸い込まれて吹き飛ばされる', fxName: '竜巻',
+      style: { cover: 'grass', min: 0.6, deco: 'tornado', sky: 0x94a3b8 },
+      fx: [{ type: 'tornado', r: 4.2, ax: 9, az: 8, sp: 0.23 }],
+      tile: (i, j) => {
+        if ((i === 0 || i === 10) && (j === 0 || j === 10)) return null;
+        if ((i === 2 || i === 8) && j >= 4 && j <= 6) return 0.7; // 柵
+        if ((j === 2 || j === 8) && i >= 4 && i <= 6) return 0.7;
+        if (i === 5 && j === 5) return 1.4;
+        return 0;
+      },
+      plats: [P(-7.8, -7.8, 3.2, 2.6, 2.6), P(7.8, 7.8, 3.2, 2.6, 2.6)] },
   };
   const MAP_KEYS = Object.keys(MAPS);
   const TEAMS = [

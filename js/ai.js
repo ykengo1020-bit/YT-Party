@@ -91,6 +91,9 @@ window.AI = (function () {
     }
     if (!A.itemGoal && A.goMars && g.mars) { gx = g.mars.x; gz = g.mars.z; want = 2.9; }
     else if (!A.itemGoal && t) { gx = t.x; gz = t.z; want = 0.95; }
+    // マップの効果（電車・雷・噴火・竜巻・満潮）から逃げる
+    const dg = g.dangerAt && !p.grab ? g.dangerAt(p.x, p.z, p.y) : null;
+    if (dg && Math.random() < 0.55 + lvl * 0.15) { gx = dg.gx; gz = dg.gz; want = 0; }
 
     // 掴んでいる → 一番近い場外方向へ運んで投げる
     if (p.grab) {
