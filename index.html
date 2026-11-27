@@ -18,13 +18,14 @@
 <!-- タイトル -->
 <div id="title" class="screen">
   <div class="logo"><div class="l1">友情ブレイカーズ</div><div class="l2"><span>3D乱闘パーティー</span></div></div>
+  <div class="vertag" id="verTag"></div>
   <div class="panel titlebox">
     <div><label class="lab">プレイヤー名</label><input id="name" class="txt" maxlength="10" placeholder="なまえ"></div>
     <button class="btn" id="bSolo">CPUと遊ぶ（ひとりで）</button>
     <button class="btn pink" id="bHost">オンラインの部屋を作る</button>
     <div class="row"><input id="roomIn" class="txt" maxlength="5" placeholder="部屋コード"><button class="btn cyan" id="bJoin" style="flex:0 0 auto">参加</button></div>
     <div class="err" id="tErr"></div>
-    <div class="row"><button class="btn white small" id="bHelp">操作説明</button><button class="btn white small" id="bRules">ルール説明</button><button class="btn white small" id="bSet">設定</button></div>
+    <div class="row"><button class="btn white small" id="bHelp">操作説明</button><button class="btn white small" id="bRules">ルール説明</button><button class="btn white small" id="bSet">設定</button><button class="btn white small logbtn" id="bLog">更新履歴<span class="newdot hidden" id="logNew">NEW</span></button></div>
     <div class="row mobrow"><button class="btn white small" id="bMobile"></button><button class="btn white small hidden" id="bFull" style="flex:0 0 auto">全画面</button></div>
     <div class="tiny">オンライン対戦はブラウザ同士の直接通信です。接続の仲介にPeerJSの無料サーバーを使うのでネット接続が必要です。</div>
   </div>
@@ -133,6 +134,14 @@
   <div class="helptip" id="helpTip"></div>
 </div></div>
 
+<!-- 更新履歴 -->
+<div id="changelog" class="ov hidden"><div class="panel logpanel">
+  <div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="h1" style="flex:0 0 auto;margin:0">📜 更新履歴</div>
+    <div style="flex:0 0 auto;display:flex;gap:8px;align-items:center"><span class="tiny" id="logVer"></span><button class="btn small" data-close>とじる</button></div></div>
+  <div class="logfilter" id="logFilter"></div>
+  <div class="loglist" id="logList"></div>
+</div></div>
+
 <!-- ルール説明 -->
 <div id="rules" class="ov hidden"><div class="panel rulebook">
   <div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="h1" style="flex:0 0 auto;margin:0">ルール説明</div><button class="btn small" data-close style="flex:0 0 auto">とじる</button></div>
@@ -193,6 +202,7 @@
 <script src="js/audio.js"></script>
 <script src="js/render.js"></script>
 <script src="js/net.js"></script>
+<script src="js/changelog.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

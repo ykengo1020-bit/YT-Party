@@ -697,6 +697,14 @@ window.Render = (function () {
 
   // ---------- エフェクト ----------
   const flashTex = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,240,180,.8)'); gr.addColorStop(1, 'rgba(255,200,100,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+  // 演出が終わったらGPUのメモリを解放する（長い試合でも重くならないように）
+  function disposeFx(o) {
+    o.traverse((c) => {
+      if (c.geometry) c.geometry.dispose();
+      const m = c.material; if (!m) return;
+      (Array.isArray(m) ? m : [m]).forEach((mm) => { if (mm.map && mm.map !== flashTex && mm.map !== circleTex) mm.map.dispose(); mm.dispose(); });
+    });
+  }
   function addFx(o, life, upd) { fxList.push({ o, life, max: life, upd }); scene.add(o); }
   function spark(x, y, z, p, col) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, color: col || 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
@@ -709,6 +717,90 @@ window.Render = (function () {
       const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize().multiplyScalar(4 + Math.random() * 6 * (0.5 + p));
       addFx(m, 0.4 + Math.random() * 0.3, (f, k, dt) => { m.position.addScaledVector(v, dt); v.y -= 15 * dt; m.rotation.x += dt * 10; m.scale.setScalar(k); });
     }
+  }
+  // ---------- スキル・掴みの演出 ----------
+  const addB = (c, o = 0.85) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+  const circleTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+    g.translate(128, 128); g.strokeStyle = '#fff'; g.lineWidth = 6; g.beginPath(); g.arc(0, 0, 118, 0, 7); g.stroke();
+    g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 96, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, 40, 0, 7); g.stroke();
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2, b = a + Math.PI * 2 / 3; g.beginPath(); g.moveTo(Math.cos(a) * 96, Math.sin(a) * 96); g.lineTo(Math.cos(b) * 96, Math.sin(b) * 96); g.stroke(); }
+    g.fillStyle = '#fff'; g.font = 'bold 16px sans-serif'; g.textAlign = 'center';
+    const T = '友情ブレイカーズ★スキル発動★'; for (let i = 0; i < T.length; i++) { const a = (i / T.length) * Math.PI * 2; g.save(); g.rotate(a); g.fillText(T[i], 0, -102); g.restore(); }
+    const t = new THREE.CanvasTexture(c); return t;
+  })();
+  // スキル発動：足元の魔法陣・光の柱・らせんの粒、狙った相手へ光線と着弾
+  function castFx(e) {
+    const ch = chars.get(e.id);
+    const x = ch ? ch.root.position.x : e.x, y = ch ? ch.root.position.y : e.y, z = ch ? ch.root.position.z : e.z;
+    const col = new THREE.Color(e.c).lerp(new THREE.Color(0xffffff), 0.25).getHex();
+    const mc = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: circleTex, color: col, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    mc.rotation.x = -Math.PI / 2; mc.position.set(x, y + 0.06, z);
+    addFx(mc, 0.9, (f, k, dt) => { mc.rotation.z += dt * 3; const s = k > 0.8 ? (1 - k) / 0.2 : 1; mc.scale.setScalar(0.3 + s * 0.9 + (1 - k) * 0.3); mc.material.opacity = Math.min(1, k * 1.6); });
+    const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 5, 20, 1, true), addB(col, 0.5)); pil.position.set(x, y + 2.5, z);
+    addFx(pil, 0.55, (f, k) => { pil.material.opacity = k * 0.5; pil.scale.set(0.4 + (1 - k), 1, 0.4 + (1 - k)); });
+    spark(x, y + 1.2, z, 0.9, col);
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), addB(i % 2 ? col : 0xffffff, 1));
+      const a0 = (i / 14) * Math.PI * 2, r0 = 1.1;
+      addFx(m, 0.8, (f, k) => { const t = 1 - k, a = a0 + t * 6; m.position.set(x + Math.cos(a) * r0 * (1 - t * 0.5), y + 0.2 + t * 3.2, z + Math.sin(a) * r0 * (1 - t * 0.5)); m.material.opacity = k; });
+    }
+    if (e.kind === 'self') { const rg = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.07, 6, 30), addB(col, 0.9)); rg.rotation.x = Math.PI / 2; rg.position.set(x, y + 0.2, z); addFx(rg, 0.6, (f, k) => { rg.position.y = y + 0.2 + (1 - k) * 2.4; rg.scale.setScalar(1 + (1 - k) * 0.6); rg.material.opacity = k; }); }
+    if (e.kind === 'aoe') wave(x, y + 0.15, z, 9, col);
+    // 狙った相手へ
+    (e.tg || []).forEach((tid, i) => {
+      const tc = chars.get(tid); if (!tc) return;
+      const a = [x, y + 1.3, z], b = [tc.root.position.x, tc.root.position.y + 1.1, tc.root.position.z];
+      later(0.12 + i * 0.05, () => {
+        zap(a, b, col);
+        spark(b[0], b[1], b[2], 0.8, col);
+        const st = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.55, 5, 1), addB(0xffffff, 0.95)); st.position.set(b[0], b[1], b[2]); st.lookAt(camera.position);
+        addFx(st, 0.35, (f, k) => { st.scale.setScalar(1 + (1 - k) * 2.2); st.rotation.z += 0.2; st.material.opacity = k; });
+      });
+    });
+  }
+  // 演出の時間で少し後に実行（録画でもずれない）
+  function later(sec, fn) { let done = false; addFx(new THREE.Group(), sec, (f) => { if (!done && f.life <= 0.02) { done = true; fn(); } }); }
+  // ジグザグの光線
+  function zap(a, b, col) {
+    const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b), pts = [];
+    for (let i = 0; i <= 10; i++) { const p = A.clone().lerp(Bv, i / 10); if (i && i < 10) p.add(new THREE.Vector3((Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.7)); pts.push(p); }
+    const t = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.07, 5, false), addB(col, 1));
+    const core = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.025, 4, false), addB(0xffffff, 1)); t.add(core);
+    addFx(t, 0.3, (f, k) => { t.material.opacity = k; core.material.opacity = k; });
+  }
+  // 掴みの空振り／つかみかかり：左右から閉じる2本の弧
+  function grabSwing(e) {
+    const g = new THREE.Group(); g.position.set(e.x, e.y + 1.0, e.z); g.rotation.y = e.yw;
+    const col = e.ok ? 0xffa53b : 0xffffff;
+    const arcs = [-1, 1].map((s) => { const m = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.8, 16, 1, 0, 1.3), addB(col, 0.8)); m.rotation.x = -Math.PI / 2; g.add(m); m.userData.s = s; return m; });
+    for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.55), addB(col, 0.8)); l.position.set((i - 1.5) * 0.2, (Math.random() - 0.5) * 0.4, 0.9); g.add(l); }
+    addFx(g, 0.22, (f, k) => { arcs.forEach((m) => { m.rotation.z = Math.PI / 2 + m.userData.s * (0.2 + k * 1.1) - 0.65; }); g.children.forEach((c) => (c.material.opacity = k * 0.85)); g.position.x += Math.sin(e.yw) * 0.03; g.position.z += Math.cos(e.yw) * 0.03; });
+  }
+  // 掴んだ瞬間
+  function grabCatch(e) {
+    const col = new THREE.Color(e.c).lerp(new THREE.Color(0xffd166), 0.5).getHex();
+    spark(e.x, e.y, e.z, 0.9, 0xffd166);
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.6, 24), addB(col, 0.95)); r.position.set(e.x, e.y, e.z); r.lookAt(camera.position);
+    addFx(r, 0.3, (f, k) => { r.scale.setScalar(1 + (1 - k) * 2.6); r.material.opacity = k; });
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; const l = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), addB(0xffffff, 0.9)); l.position.set(e.x, e.y, e.z); const v = new THREE.Vector3(Math.cos(a), Math.sin(a), 0).applyQuaternion(r.quaternion); l.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v); addFx(l, 0.25, (f, k, dt) => { l.position.addScaledVector(v, dt * 6); l.material.opacity = k; }); }
+    floatText(e.x, e.y + 1.4, e.z, 'ガシッ！', '#ffb020', false);
+  }
+  // 投げ：頭上から振り下ろす大きな弧＋衝撃の輪
+  function throwFx(e) {
+    const g = new THREE.Group(); g.position.set(e.x, e.y + 1.2, e.z); g.rotation.y = e.yw;
+    const col = e.big ? 0xff7a2f : 0xffc04a;
+    const arc = new THREE.Mesh(new THREE.RingGeometry(1.0, e.big ? 1.6 : 1.35, 26, 1, 0, 2.8), addB(col, 0.9));
+    arc.rotation.y = Math.PI / 2; arc.rotation.z = -0.2; g.add(arc);
+    addFx(g, 0.3, (f, k) => { arc.material.opacity = k * 0.9; arc.scale.setScalar(1 + (1 - k) * 0.4); });
+    wave(e.x + Math.sin(e.yw) * 1.2, e.y + 0.1, e.z + Math.cos(e.yw) * 1.2, e.big ? 2.6 : 1.8, col);
+    floatText(e.x, e.y + 2.6, e.z, e.big ? 'ブンッ！！' : 'ブンッ！', '#ff8a3b', false);
+  }
+  // 投げられて飛んでいる間の軌跡
+  function trailPuff(ch, col) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), addB(col, 0.55));
+    m.position.copy(ch.root.position); m.position.y += 0.9;
+    addFx(m, 0.35, (f, k) => { m.material.opacity = k * 0.55; m.scale.setScalar(0.4 + k * 0.8); });
   }
   // パンチの振り抜きエフェクト（三日月の軌跡＋スピード線）
   function swoosh(e) {
@@ -963,6 +1055,10 @@ window.Render = (function () {
       else if (e.k === 'djump') { wave(e.x, e.y, e.z, 1.6, 0xffffff); const ch = chars.get(e.id); if (ch) ch.flip = 0.4; }
       else if (e.k === 'smash') { const ch = chars.get(e.id); if (ch) ch.trail = Math.min(1.6, e.p / 25); shake = Math.max(shake, Math.min(0.8, e.p / 60)); }
       else if (e.k === 'swing') swoosh(e);
+      else if (e.k === 'cast') castFx(e);
+      else if (e.k === 'gswing') grabSwing(e);
+      else if (e.k === 'gcatch') grabCatch(e);
+      else if (e.k === 'throwfx') throwFx(e);
       else if (e.k === 'crumble') { spark(e.x, 0, e.z, 0.8, 0xc2915a); }
       else if (e.k === 'txt' || e.k === 'skill') {
         let x = 0, y = 9, z = 0;
@@ -974,7 +1070,7 @@ window.Render = (function () {
       const f = fxList[i]; f.life -= dt;
       const k = Math.max(0, f.life / f.max);
       f.upd(f, k, dt);
-      if (f.life <= 0) { scene.remove(f.o); if (f.o.material && f.o.material.map && f.o.material.map !== flashTex) f.o.material.map.dispose(); fxList.splice(i, 1); }
+      if (f.life <= 0) { scene.remove(f.o); disposeFx(f.o); fxList.splice(i, 1); }
     }
 
     // カメラ（急に飛ばないように：最大速度つきで追いかける）
@@ -1060,6 +1156,13 @@ window.Render = (function () {
     if (!p.gr) { la = -2.6; ra = -2.6; lz = 0.5; rz = -0.5; }
     if (p.gd) { la = ra = -1.5; lz = -0.6; rz = 0.6; }
     if (p.gb) { la = ra = -1.45; lz = -0.15; rz = 0.15; }
+    // 掴みかかる：両腕を前へ伸ばす
+    let grabReach = 1;
+    if (p.ga > 0 && !p.tw) { la = ra = -1.6; lz = -0.25; rz = 0.25; grabReach = 1 + 0.45 * Math.sin(Math.min(1, p.ga / 0.28) * Math.PI); }
+    // 投げ：両腕を頭上から振り下ろす
+    if (p.tw) { la = ra = -2.6 + (1 - Math.min(1, p.ga / 0.35)) * 1.6; lz = -0.1; rz = 0.1; }
+    // スキル発動：両腕を上げる
+    if (p.cs && !p.pt && !p.gb) { la = ra = -2.9; lz = -0.45; rz = 0.45; }
     if (p.ld) { la = ra = -3.0; lz = rz = 0; }
     if (p.ch > 0.35) { if (p.ps) la = 0.8; else ra = 0.8; }
     // パンチ：引く → 体をひねって突き出す（腕が伸びる） → 戻す
@@ -1081,7 +1184,8 @@ window.Render = (function () {
     const armK = Math.min(1, dt * (punching ? 40 : 22));
     L.piv.rotation.x += (la - L.piv.rotation.x) * armK; Rr.piv.rotation.x += (ra - Rr.piv.rotation.x) * armK;
     const pa = p.ps ? L : Rr, oa = p.ps ? Rr : L;
-    pa.piv.scale.y += (reach - pa.piv.scale.y) * armK; oa.piv.scale.y += (1 - oa.piv.scale.y) * armK;
+    const oReach = grabReach > 1 ? grabReach : 1; if (grabReach > 1) reach = grabReach;
+    pa.piv.scale.y += (reach - pa.piv.scale.y) * armK; oa.piv.scale.y += (oReach - oa.piv.scale.y) * armK;
     pa.f.scale.setScalar(pa.f.scale.x + (fistS - pa.f.scale.x) * armK); oa.f.scale.setScalar(oa.f.scale.x + (1 - oa.f.scale.x) * armK);
     ch.inner.rotation.y += (twist - ch.inner.rotation.y) * Math.min(1, dt * (punching ? 30 : 12));
     ch.inner.rotation.x += lean;
@@ -1118,6 +1222,7 @@ window.Render = (function () {
     const open = !!(p.hs || p.sn > 0 || p.gby || (!p.gr && p.vy > 6) || has('takawarai'));
     ch.mouth.visible = !open; ch.mouthO.visible = open;
     if (open) ch.mouthO.scale.y = 1.15 + Math.sin(now * 18) * (has('takawarai') ? 0.3 : 0.08);
+    if (p.tr && Math.random() < 0.8) trailPuff(ch, 0xffc04a);
     // 自転車の車輪
     if (bf.bike) ch.bike.children.forEach((w) => { if (w.userData.wheel) w.rotation.x += spd * dt * 3.2; });
     // にもの大鎌：大鎌ダッシュ中は手に持って振り抜く
@@ -1148,6 +1253,7 @@ window.Render = (function () {
     else if (p.h >= 100) emi.setRGB(Math.min(0.4, 0.1 + p.h / 1000) + Math.sin(now * 12) * 0.1, 0.03, 0);
     else emi.setRGB(0, 0, 0);
     if (s.bo) emi.add(new THREE.Color(0.05, 0.05, 0.08));
+    if (p.cs) emi.add(new THREE.Color(0.22 + Math.sin(now * 30) * 0.08, 0.22, 0.18));
     R.visible = !(p.inv && Math.sin(now * 30) > 0.5);
     if (has('lag') && Math.random() < 0.04) R.position.x += (Math.random() - 0.5) * 0.6;
     // チームの輪

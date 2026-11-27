@@ -1037,6 +1037,28 @@
     drawGamechu(dt);
     if (snap.ov && !S.ended) showResult(snap.ov, snap);
   }
+  // ---------- 更新履歴 ----------
+  const LOG_TAG = { new: ['新機能', '#16a34a'], fix: ['バグ修正', '#dc2626'], bal: ['バランス', '#7c3aed'], fx: ['演出・見た目', '#0891b2'] };
+  let logFilter = 'all';
+  function renderLog() {
+    const L = window.CHANGELOG || [];
+    $('logVer').textContent = L.length ? `現在のバージョン v${L[0].v}` : '';
+    $('logFilter').innerHTML = [['all', 'すべて', '#15121f']].concat(Object.entries(LOG_TAG).map(([k, [n, c]]) => [k, n, c]))
+      .map(([k, n, c]) => `<button class="lf ${logFilter === k ? 'on' : ''}" data-f="${k}" style="--c:${c}">${n}</button>`).join('');
+    $('logFilter').querySelectorAll('button').forEach((b) => (b.onclick = () => { logFilter = b.dataset.f; renderLog(); Sfx.play('click'); }));
+    const seen = localStorage.getItem('yb_logSeen');
+    $('logList').innerHTML = L.map((r, i) => {
+      const its = r.items.filter(([t]) => logFilter === 'all' || t === logFilter);
+      if (!its.length) return '';
+      const isNew = i === 0 || (seen && r.v > seen);
+      return `<div class="logv ${i === 0 ? 'latest' : ''}"><div class="lh"><span class="vv">v${r.v}</span><b>${esc(r.title)}</b>${isNew && i === 0 ? '<span class="newdot">最新</span>' : ''}<span class="dt">${r.date}</span></div>
+        <ul>${its.map(([t, txt]) => `<li><span class="lt" style="background:${LOG_TAG[t][1]}">${LOG_TAG[t][0]}</span>${esc(txt)}</li>`).join('')}</ul></div>`;
+    }).join('') || '<div class="tiny">この種類の更新はまだありません</div>';
+  }
+  function logLatest() { const L = window.CHANGELOG || []; return L.length ? L[0].v : ''; }
+  $('bLog').onclick = () => { renderLog(); show('changelog'); Sfx.play('click'); try { localStorage.setItem('yb_logSeen', logLatest()); } catch (e) { /* noop */ } show('logNew', false); };
+  try { show('logNew', localStorage.getItem('yb_logSeen') !== logLatest()); } catch (e) { /* noop */ }
+  $('verTag').textContent = logLatest() ? 'v' + logLatest() : '';
   // タブを閉じたらすぐ切断を知らせる
   window.addEventListener('pagehide', () => { try { Net.close(); } catch (e) { /* noop */ } });
   Settings.apply();

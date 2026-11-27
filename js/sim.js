@@ -312,7 +312,9 @@ window.Sim = (function () {
         const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
         t.inv = 0;
         this.hit(t, p, 8, pw, fx, fz, 0.5, { unblock: true, noCathy: false });
-        t.thrown = 0.3;
+        t.thrown = 0.3; t.trail = 0.9;
+        this.emit({ k: 'throwfx', id: p.id, x: p.x, y: p.y, z: p.z, yw: p.yaw, big: pw > 7 ? 1 : 0 });
+        p.grabAnim = 0.35; p.throwAnim = 0.35;
         p.tp = Math.min(30, p.tp + 1);
         this.emit({ k: 'sfx', n: 'throw' });
       } else { t.vx += Math.sin(p.yaw) * 2; t.vz += Math.cos(p.yaw) * 2; }
@@ -325,6 +327,14 @@ window.Sim = (function () {
       if (sk.id === 'positive' && p.positive) { this.emit({ k: 'txt', id: p.id, s: 'もう使った', c: '#9ca3af' }); return; }
       p.tp -= sk.tp;
       this.emit({ k: 'skill', id: p.id, s: sk.name, c: '#' + CHARS[p.char].color.toString(16).padStart(6, '0') });
+      // スキルの演出用：だれに向けたスキルか
+      {
+        const AOE = ['modifier', 'soundboard', 'chudoku', 'sniper', 'fish', 'edit', 'kichige', 'mic'], AIM = ['role', 'tenjou', 'snipe', 'muku'];
+        const kind = AOE.includes(sk.id) ? 'aoe' : AIM.includes(sk.id) ? 'aim' : 'self';
+        const tg = kind === 'aoe' ? this.others(p).filter((q) => !q.minion).map((q) => q.id) : kind === 'aim' ? [(this.aimTarget(p) || {}).id].filter(Boolean) : [];
+        this.emit({ k: 'cast', id: p.id, sid: sk.id, kind, tg, c: CHARS[p.char].color, x: p.x, y: p.y, z: p.z, yw: p.yaw });
+        p.castT = 0.5;
+      }
       this.emit({ k: 'sfx', n: 'skill' });
       const O = this.others(p);
       const all = (fn) => O.forEach(fn);
@@ -414,6 +424,7 @@ window.Sim = (function () {
       const sp = CHARS[p.char].passive.special;
       if (!sp || sp === 'rhythm') return;
       if (p.spCD > 0) { this.emit({ k: 'deny', id: p.id }); return; }
+      if (sp === 'bike' || sp === 'weapon') { this.emit({ k: 'cast', id: p.id, sid: sp, kind: 'self', tg: [], c: CHARS[p.char].color, x: p.x, y: p.y, z: p.z, yw: p.yaw }); p.castT = 0.4; }
       if (sp === 'bike') { p.buffs.bike = 6; p.spCD = 70; this.emit({ k: 'txt', id: p.id, s: 'バイク召喚！', c: '#fb923c' }); this.emit({ k: 'sfx', n: 'bike' }); }
       if (sp === 'weapon') { if (p.item) this.dropItem(p); const w = ['ar', 'sr', 'sg'][p.input.sel % 3]; this.giveItem(p, w); p.spCD = 55; }
       if (sp === 'scythe') {
@@ -731,6 +742,7 @@ window.Sim = (function () {
       if (p.buffs.ken) { p.buffs.ken.t -= dt; if (p.buffs.ken.t <= 0) delete p.buffs.ken; }
       if (p.cathy) { p.cathy.t -= dt; if (p.cathy.t <= 0) p.cathy = null; }
       p.inv = Math.max(0, p.inv - dt); p.hitstun = Math.max(0, p.hitstun - dt); p.thrown = Math.max(0, p.thrown - dt);
+      p.castT = Math.max(0, (p.castT || 0) - dt); p.grabAnim = Math.max(0, (p.grabAnim || 0) - dt); p.throwAnim = Math.max(0, (p.throwAnim || 0) - dt); p.trail = Math.max(0, (p.trail || 0) - dt);
       p.punchCD -= dt; p.headCD -= dt; p.grabCD -= dt; p.ledgeCD -= dt; p.dashCD -= dt; p.fireCD -= dt; p.spCD = Math.max(0, p.spCD - dt);
       p.punchT = Math.max(0, p.punchT - dt); p.headT = Math.max(0, p.headT - dt); p.crouchT = Math.max(0, p.crouchT - dt);
       p.dashT = Math.max(0, p.dashT - dt); p.scy = Math.max(0, (p.scy || 0) - dt); p.rhythmCD = Math.max(0, p.rhythmCD - dt);
@@ -944,7 +956,9 @@ window.Sim = (function () {
       // 掴み
       if (act && b.grab && !p.grab && p.grabCD <= 0 && !this.disabled(p, 'grab')) {
         p.grabCD = 0.5; // 空振りにも隙
+        p.grabAnim = 0.28;
         const cands = this.targetsInFront(p, 0.9, 0.3).filter((q) => !q.grabbedBy && q.inv <= 0 && !q.grab && !this.ally(p, q));
+        this.emit({ k: 'gswing', id: p.id, ok: cands.length ? 1 : 0, x: p.x, y: p.y, z: p.z, yw: p.yaw });
         if (cands.length) {
           const q = cands[0];
           if (q.cathy && q.cathy.n > 0) { this.cathyAbsorb(q); p.grabCD = 0.6; }
@@ -952,6 +966,7 @@ window.Sim = (function () {
             p.grab = q.id; p.grabT = 0; q.grabbedBy = p.id; q.escape = 0; q.ledge = null;
             if (q.grab) this.release(q, false);
             this.emit({ k: 'sfx', n: 'grab' });
+            this.emit({ k: 'gcatch', id: q.id, x: q.x, y: q.y + 1.1, z: q.z, c: CHARS[p.char].color });
           }
         }
       }
@@ -1146,7 +1161,7 @@ window.Sim = (function () {
           id: p.id, n: p.name, c: p.char, tm: p.team, x: r2(p.x), y: r2(p.y), z: r2(p.z), yw: r2(p.yaw), vy: r2(p.vy),
           h: Math.round(p.hero), l: p.lives, tp: p.tp, k: p.kills, tk: p.ticket, tkp: p.ticketProg,
           e: p.elim ? 1 : 0, rs: p.respawn > 0 ? r2(p.respawn) : 0, inv: p.inv > 0 ? 1 : 0, mi: p.minion ? 1 : 0, bot: p.bot ? 1 : 0,
-          gr: p.ground ? 1 : 0, pt: r2(p.punchT), ps: p.punchSide, ch: r2(p.charging), hd: r2(p.headT), gb: p.grab || 0, gby: p.grabbedBy || 0,
+          gr: p.ground ? 1 : 0, pt: r2(p.punchT), ps: p.punchSide, ch: r2(p.charging), hd: r2(p.headT), gb: p.grab || 0, gby: p.grabbedBy || 0, cs: p.castT > 0 ? 1 : 0, ga: r2(p.grabAnim || 0), tw: p.throwAnim > 0 ? 1 : 0, tr: p.trail > 0 ? 1 : 0,
           ld: p.ledge ? 1 : 0, sn: r2(p.stun), hs: p.hitstun > 0 ? 1 : 0, gd: p.guard ? 1 : 0, ds: p.dashT > 0 ? 1 : 0, sy: p.scy > 0 ? 1 : 0, cr: p.crouchT > 0 ? 1 : 0,
           st: Object.keys(p.st).map((k) => [k, r2(p.st[k].t), p.st[k].lv, p.st[k].dis || '']),
           bf: Object.keys(p.buffs).filter((k) => typeof p.buffs[k] === 'number' || k === 'ken').map((k) => [k, r2(typeof p.buffs[k] === 'number' ? p.buffs[k] : p.buffs[k].t), k === 'ken' ? p.buffs.ken.k : 0]),
